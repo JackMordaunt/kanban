@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"log"
 	"os"
+	"unsafe"
 
 	"git.sr.ht/~jackmordaunt/kanban"
 
@@ -31,7 +32,22 @@ func main() {
 	ui := &UI{
 		Window: w,
 		Th:     th,
-		Engine: &kanban.Engine{},
+		Engine: &kanban.Engine{
+			Stages: []kanban.Stage{
+				{
+					Name: "Todo",
+				},
+				{
+					Name: "In Progress",
+				},
+				{
+					Name: "Testing",
+				},
+				{
+					Name: "Done",
+				},
+			},
+		},
 		// TODO: render dynamically from storage.
 		Panels: []Panel{
 			{
@@ -75,12 +91,12 @@ type (
 // this object.
 type UI struct {
 	*app.Window
-	Engine     *kanban.Engine
-	Th         *material.Theme
-	Panels     []Panel
-	Tickets    []Ticket
-	Modal      layout.Widget
-	TicketForm TicketForm
+	Engine       *kanban.Engine
+	Th           *material.Theme
+	Panels       []Panel
+	TicketStates Map
+	Modal        layout.Widget
+	TicketForm   TicketForm
 }
 
 func (ui *UI) Loop() error {
@@ -111,6 +127,37 @@ func (ui *UI) Update(gtx C) {
 			}
 		}
 	}
+	for _, state := range ui.TicketStates.List() {
+		state := (*Ticket)(state)
+		if state.NextButton.Clicked() {
+			if err := func() error {
+				next, err := ui.Engine.NextStage(state.Stage)
+				if err != nil {
+					return fmt.Errorf("getting next stage: %w", err)
+				}
+				if err := ui.Engine.Move(next, state.Ticket.ID); err != nil {
+					return fmt.Errorf("moving ticket: %s", err)
+				}
+				return nil
+			}(); err != nil {
+				fmt.Printf("error: %s\n", err)
+			}
+		}
+		if state.PrevButton.Clicked() {
+			if err := func() error {
+				next, err := ui.Engine.PreviousStage(state.Stage)
+				if err != nil {
+					return fmt.Errorf("getting previous stage: %w", err)
+				}
+				if err := ui.Engine.Move(next, state.Ticket.ID); err != nil {
+					return fmt.Errorf("moving ticket: %s", err)
+				}
+				return nil
+			}(); err != nil {
+				fmt.Printf("error: %s\n", err)
+			}
+		}
+	}
 	if ui.TicketForm.Submit.Clicked() {
 		ticket, err := ui.TicketForm.Validate()
 		if err != nil {
@@ -134,18 +181,20 @@ func (ui *UI) Layout(gtx C) D {
 	return layout.Stack{}.Layout(
 		gtx,
 		layout.Stacked(func(gtx C) D {
+			ui.TicketStates.Begin()
 			var panels = make([]layout.FlexChild, len(ui.Panels))
-			for ii := range ui.Panels {
-				panel := &ui.Panels[ii]
-				panels[ii] = layout.Flexed(1, func(gtx C) D {
-					panel := panel
+			for kk := range ui.Panels {
+				panel := &ui.Panels[kk]
+				panels[kk] = layout.Flexed(1, func(gtx C) D {
 					stage, _ := ui.Engine.Stage(panel.Label)
-					var cards = make([]layout.Widget, len(stage.Tickets))
+					var cards = make([]layout.ListElement, len(stage.Tickets))
 					for ii, ticket := range stage.Tickets {
-						ticket := ticket
-						cards[ii] = func(gtx C) D {
-							// TODO: ticket state needs to live somewhere.
-							return (&TicketStyle{Ticket: ticket}).Layout(gtx, ui.Th)
+						id := ticket.ID.String()
+						cards[ii] = func(gtx C, ii int) D {
+							t := (*Ticket)(ui.TicketStates.Next(id, unsafe.Pointer(&Ticket{})))
+							t.Ticket = stage.Tickets[ii]
+							t.Stage = stage.Name
+							return t.Layout(gtx, ui.Th)
 						}
 					}
 					return panel.Layout(gtx, ui.Th, cards...)
@@ -348,10 +397,11 @@ type Panel struct {
 	Color        color.RGBA
 	Thickness    unit.Value
 	CreateTicket widget.Clickable
+
 	layout.List
 }
 
-func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.Widget) D {
+func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.ListElement) D {
 	return widget.Border{
 		Color: color.RGBA{A: 200},
 		Width: unit.Dp(0.5),
@@ -419,7 +469,7 @@ func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.Widget) D {
 									Width: unit.Dp(0.5),
 									Color: color.RGBA{A: 200},
 								}.Layout(gtx, func(gtx C) D {
-									return tickets[ii](gtx)
+									return tickets[ii](gtx, ii)
 								})
 							})
 						})
@@ -430,16 +480,15 @@ func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.Widget) D {
 	})
 }
 
-// TicketStyle renders a ticket control.
-type TicketStyle struct {
-	kanban.Ticket
-}
-
+// Ticket renders a ticket control.
 type Ticket struct {
-	MoveButton widget.Clickable
+	kanban.Ticket
+	Stage      string
+	NextButton widget.Clickable
+	PrevButton widget.Clickable
 }
 
-func (t *TicketStyle) Layout(gtx C, th *material.Theme) D {
+func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 	return layout.Flex{
 		Axis: layout.Horizontal,
 	}.Layout(
@@ -492,15 +541,84 @@ func (t *TicketStyle) Layout(gtx C, th *material.Theme) D {
 				}),
 				layout.Rigid(func(gtx C) D {
 					// bottom controls
-					return Rect{
-						Color: color.RGBA{A: 100},
-						Size: f32.Point{
-							X: float32(gtx.Constraints.Max.X),
-							Y: float32(gtx.Px(unit.Dp(15))),
-						},
-					}.Layout(gtx)
+					gtx.Constraints.Max = image.Point{
+						X: gtx.Constraints.Max.X,
+						Y: gtx.Px(unit.Dp(20)),
+					}
+					gtx.Constraints.Min = image.Point{
+						Y: gtx.Px(unit.Dp(20)),
+					}
+					return layout.Stack{}.Layout(
+						gtx,
+						layout.Expanded(func(gtx C) D {
+							return Rect{
+								Color: color.RGBA{A: 100},
+								Size: f32.Point{
+									X: layout.FPt(gtx.Constraints.Max).X,
+									Y: layout.FPt(gtx.Constraints.Min).Y,
+								},
+							}.Layout(gtx)
+						}),
+						layout.Stacked(func(gtx C) D {
+							return layout.UniformInset(unit.Dp(2.5)).Layout(gtx, func(gtx C) D {
+								inset := layout.Inset{Left: unit.Dp(2), Right: unit.Dp(2)}
+								return layout.Flex{
+									Axis: layout.Horizontal,
+								}.Layout(
+									gtx,
+									layout.Flexed(1, func(gtx C) D {
+										return D{Size: gtx.Constraints.Max}
+									}),
+									layout.Flexed(1, func(gtx C) D {
+										return inset.Layout(gtx, func(gtx C) D {
+											btn := material.IconButton(th, &t.PrevButton, icons.BackIcon)
+											btn.Size = unit.Dp(15)
+											gtx.Constraints.Max.X = gtx.Px(unit.Dp(15))
+											return btn.Layout(gtx)
+										})
+									}),
+									layout.Flexed(1, func(gtx C) D {
+										return inset.Layout(gtx, func(gtx C) D {
+											btn := material.IconButton(th, &t.NextButton, icons.ForwardIcon)
+											btn.Size = unit.Dp(15)
+											gtx.Constraints.Max.X = gtx.Px(unit.Dp(15))
+											return btn.Layout(gtx)
+										})
+									}),
+								)
+							})
+						}),
+					)
 				}),
 			)
 		}),
 	)
+}
+
+// Map of arbitrary data.
+type Map struct {
+	data map[string]unsafe.Pointer
+}
+
+func (m *Map) Begin() {
+	if m.data == nil {
+		m.data = make(map[string]unsafe.Pointer)
+	}
+}
+
+func (m *Map) Next(k string, v unsafe.Pointer) unsafe.Pointer {
+	if _, ok := m.data[k]; !ok {
+		m.data[k] = v
+	}
+	return m.data[k]
+}
+
+func (m *Map) List() []unsafe.Pointer {
+	list := []unsafe.Pointer{}
+	for _, v := range m.data {
+		if v != nil {
+			list = append(list, v)
+		}
+	}
+	return list
 }

@@ -10,6 +10,11 @@ var BackIcon *widget.Icon = func() *widget.Icon {
 	return icon
 }()
 
+var ForwardIcon *widget.Icon = func() *widget.Icon {
+	icon, _ := widget.NewIcon(icons.NavigationArrowForward)
+	return icon
+}()
+
 var ClearIcon *widget.Icon = func() *widget.Icon {
 	icon, _ := widget.NewIcon(icons.ContentClear)
 	return icon
