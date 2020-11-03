@@ -32,7 +32,7 @@ func main() {
 	ui := &UI{
 		Window: w,
 		Th:     th,
-		Engine: &kanban.Engine{
+		Kanban: &kanban.Kanban{
 			Stages: []kanban.Stage{
 				{
 					Name: "Todo",
@@ -91,7 +91,7 @@ type (
 // this object.
 type UI struct {
 	*app.Window
-	Engine       *kanban.Engine
+	Kanban       *kanban.Kanban
 	Th           *material.Theme
 	Panels       []Panel
 	TicketStates Map
@@ -130,30 +130,12 @@ func (ui *UI) Update(gtx C) {
 	for _, state := range ui.TicketStates.List() {
 		state := (*Ticket)(state)
 		if state.NextButton.Clicked() {
-			if err := func() error {
-				next, err := ui.Engine.NextStage(state.Stage)
-				if err != nil {
-					return fmt.Errorf("getting next stage: %w", err)
-				}
-				if err := ui.Engine.Move(next, state.Ticket.ID); err != nil {
-					return fmt.Errorf("moving ticket: %s", err)
-				}
-				return nil
-			}(); err != nil {
+			if err := ui.Kanban.Progress(state.ID); err != nil {
 				fmt.Printf("error: %s\n", err)
 			}
 		}
 		if state.PrevButton.Clicked() {
-			if err := func() error {
-				next, err := ui.Engine.PreviousStage(state.Stage)
-				if err != nil {
-					return fmt.Errorf("getting previous stage: %w", err)
-				}
-				if err := ui.Engine.Move(next, state.Ticket.ID); err != nil {
-					return fmt.Errorf("moving ticket: %s", err)
-				}
-				return nil
-			}(); err != nil {
+			if err := ui.Kanban.Regress(state.ID); err != nil {
 				fmt.Printf("error: %s\n", err)
 			}
 		}
@@ -164,7 +146,7 @@ func (ui *UI) Update(gtx C) {
 			fmt.Printf("error: %s", err)
 			return
 		}
-		if err := ui.Engine.Assign(ui.TicketForm.Stage, ticket); err != nil {
+		if err := ui.Kanban.Assign(ui.TicketForm.Stage, ticket); err != nil {
 			fmt.Printf("error: %s", err)
 			return
 		}
@@ -186,7 +168,7 @@ func (ui *UI) Layout(gtx C) D {
 			for kk := range ui.Panels {
 				panel := &ui.Panels[kk]
 				panels[kk] = layout.Flexed(1, func(gtx C) D {
-					stage, _ := ui.Engine.Stage(panel.Label)
+					stage, _ := ui.Kanban.Stage(panel.Label)
 					var cards = make([]layout.ListElement, len(stage.Tickets))
 					for ii, ticket := range stage.Tickets {
 						id := ticket.ID.String()
