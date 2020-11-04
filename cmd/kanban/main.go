@@ -70,7 +70,7 @@ func main() {
 		Panels: []Panel{
 			{
 				Label:     "Todo",
-				Color:     color.RGBA{R: 200, G: 200, B: 200, A: 255},
+				Color:     color.RGBA{R: 220, G: 220, B: 220, A: 255},
 				Thickness: unit.Dp(50),
 			},
 			{
@@ -483,9 +483,11 @@ func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.ListElement)
 // Ticket renders a ticket control.
 type Ticket struct {
 	kanban.Ticket
-	Stage      string
-	NextButton widget.Clickable
-	PrevButton widget.Clickable
+	Stage        string
+	NextButton   widget.Clickable
+	PrevButton   widget.Clickable
+	EditButton   widget.Clickable
+	DeleteButton widget.Clickable
 }
 
 func (t *Ticket) Layout(gtx C, th *material.Theme) D {
@@ -494,14 +496,50 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 	}.Layout(
 		gtx,
 		layout.Rigid(func(gtx C) D {
-			// Side bar with controls
-			return Rect{
-				Color: color.RGBA{G: 100, B: 200, A: 255},
-				Size: f32.Point{
-					X: float32(gtx.Px(unit.Dp(15))),
-					Y: float32(gtx.Constraints.Max.Y),
-				},
-			}.Layout(gtx)
+			gtx.Constraints.Max = image.Point{
+				X: gtx.Px(unit.Dp(25)),
+				Y: gtx.Constraints.Max.Y,
+			}
+			leftBarColor := color.RGBA{G: 100, B: 200, A: 255}
+			return layout.Stack{}.Layout(
+				gtx,
+				layout.Expanded(func(gtx C) D {
+					return Rect{
+						Color: leftBarColor,
+						Size: f32.Point{
+							X: float32(gtx.Constraints.Min.X),
+							Y: float32(gtx.Constraints.Max.Y),
+						},
+					}.Layout(gtx)
+				}),
+				layout.Stacked(func(gtx C) D {
+					return layout.Flex{
+						Axis: layout.Vertical,
+					}.Layout(
+						gtx,
+						layout.Rigid(func(gtx C) D {
+							return Button(
+								&t.EditButton,
+								WithIcon(icons.ContentEdit),
+								WithSize(unit.Dp(18)),
+								WithInset(layout.UniformInset(unit.Dp(3))),
+								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+								WithBgColor(leftBarColor),
+							).Layout(gtx)
+						}),
+						layout.Rigid(func(gtx C) D {
+							return Button(
+								&t.DeleteButton,
+								WithIcon(icons.ContentDelete),
+								WithSize(unit.Dp(18)),
+								WithInset(layout.UniformInset(unit.Dp(3))),
+								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+								WithBgColor(leftBarColor),
+							).Layout(gtx)
+						}),
+					)
+				}),
+			)
 		}),
 		layout.Flexed(1, func(gtx C) D {
 			return layout.Flex{
@@ -509,7 +547,6 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 			}.Layout(
 				gtx,
 				layout.Flexed(1, func(gtx C) D {
-					// content
 					return layout.Inset{
 						Top:   unit.Dp(5),
 						Left:  unit.Dp(10),
@@ -540,53 +577,51 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 					})
 				}),
 				layout.Rigid(func(gtx C) D {
-					// bottom controls
 					gtx.Constraints.Max = image.Point{
 						X: gtx.Constraints.Max.X,
-						Y: gtx.Px(unit.Dp(20)),
+						Y: gtx.Px(unit.Dp(25)),
 					}
-					gtx.Constraints.Min = image.Point{
-						Y: gtx.Px(unit.Dp(20)),
-					}
+					bottomBarColor := color.RGBA{R: 220, G: 220, B: 220, A: 255}
 					return layout.Stack{}.Layout(
 						gtx,
 						layout.Expanded(func(gtx C) D {
 							return Rect{
-								Color: color.RGBA{A: 100},
+								Color: bottomBarColor,
 								Size: f32.Point{
-									X: layout.FPt(gtx.Constraints.Max).X,
-									Y: layout.FPt(gtx.Constraints.Min).Y,
+									X: float32(gtx.Constraints.Max.X),
+									Y: float32(gtx.Constraints.Min.Y),
 								},
 							}.Layout(gtx)
 						}),
 						layout.Stacked(func(gtx C) D {
-							return layout.UniformInset(unit.Dp(2.5)).Layout(gtx, func(gtx C) D {
-								inset := layout.Inset{Left: unit.Dp(2), Right: unit.Dp(2)}
-								return layout.Flex{
-									Axis: layout.Horizontal,
-								}.Layout(
-									gtx,
-									layout.Flexed(1, func(gtx C) D {
-										return D{Size: gtx.Constraints.Max}
-									}),
-									layout.Flexed(1, func(gtx C) D {
-										return inset.Layout(gtx, func(gtx C) D {
-											btn := material.IconButton(th, &t.PrevButton, icons.BackIcon)
-											btn.Size = unit.Dp(15)
-											gtx.Constraints.Max.X = gtx.Px(unit.Dp(15))
-											return btn.Layout(gtx)
-										})
-									}),
-									layout.Flexed(1, func(gtx C) D {
-										return inset.Layout(gtx, func(gtx C) D {
-											btn := material.IconButton(th, &t.NextButton, icons.ForwardIcon)
-											btn.Size = unit.Dp(15)
-											gtx.Constraints.Max.X = gtx.Px(unit.Dp(15))
-											return btn.Layout(gtx)
-										})
-									}),
-								)
-							})
+							return layout.Flex{
+								Axis: layout.Horizontal,
+							}.Layout(
+								gtx,
+								layout.Flexed(1, func(gtx C) D {
+									return D{Size: gtx.Constraints.Max}
+								}),
+								layout.Flexed(1, func(gtx C) D {
+									return Button(
+										&t.PrevButton,
+										WithIcon(icons.BackIcon),
+										WithSize(unit.Dp(12)),
+										WithInset(layout.UniformInset(unit.Dp(6))),
+										WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
+										WithBgColor(bottomBarColor),
+									).Layout(gtx)
+								}),
+								layout.Flexed(1, func(gtx C) D {
+									return Button(
+										&t.NextButton,
+										WithIcon(icons.ForwardIcon),
+										WithSize(unit.Dp(12)),
+										WithInset(layout.UniformInset(unit.Dp(6))),
+										WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
+										WithBgColor(bottomBarColor),
+									).Layout(gtx)
+								}),
+							)
 						}),
 					)
 				}),
@@ -621,4 +656,72 @@ func (m *Map) List() []unsafe.Pointer {
 		}
 	}
 	return list
+}
+
+// Button renders a clickable button.
+func Button(
+	state *widget.Clickable,
+	opt ...ButtonOption,
+) ButtonStyle {
+	btn := ButtonStyle{}
+	btn.IconButtonStyle.Button = state
+	btn.ButtonStyle.Button = state
+	for _, opt := range opt {
+		opt(&btn)
+	}
+	return btn
+}
+
+// ButtonStyle provides a unified api for both icon buttons and text buttons.
+type ButtonStyle struct {
+	material.IconButtonStyle
+	material.ButtonStyle
+}
+
+func (btn ButtonStyle) Layout(gtx C) D {
+	if btn.Icon != nil {
+		return btn.IconButtonStyle.Layout(gtx)
+	}
+	return btn.ButtonStyle.Layout(gtx)
+}
+
+type ButtonOption func(*ButtonStyle)
+
+func WithSize(sz unit.Value) ButtonOption {
+	return func(btn *ButtonStyle) {
+		btn.Size = sz
+	}
+}
+
+func WithIconColor(c color.RGBA) ButtonOption {
+	return func(btn *ButtonStyle) {
+		btn.IconButtonStyle.Color = c
+		btn.ButtonStyle.Color = c
+	}
+}
+
+func WithBgColor(c color.RGBA) ButtonOption {
+	return func(btn *ButtonStyle) {
+		btn.IconButtonStyle.Background = c
+		btn.ButtonStyle.Background = c
+	}
+}
+
+func WithIcon(icon *widget.Icon) ButtonOption {
+	return func(btn *ButtonStyle) {
+		btn.Icon = icon
+	}
+}
+
+func WithText(txt string) ButtonOption {
+	return func(btn *ButtonStyle) {
+		btn.Text = txt
+	}
+}
+
+func WithInset(inset layout.Inset) ButtonOption {
+	return func(btn *ButtonStyle) {
+		btn.IconButtonStyle.Inset = inset
+		btn.ButtonStyle.Inset = inset
+	}
 }

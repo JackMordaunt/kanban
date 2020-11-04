@@ -79,3 +79,13 @@ var IdentityIcon *widget.Icon = func() *widget.Icon {
 	icon, _ := widget.NewIcon(icons.ActionPermIdentity)
 	return icon
 }()
+
+var ContentEdit *widget.Icon = func() *widget.Icon {
+	icon, _ := widget.NewIcon(icons.ContentCreate)
+	return icon
+}()
+
+var ContentDelete *widget.Icon = func() *widget.Icon {
+	icon, _ := widget.NewIcon(icons.ContentDeleteSweep)
+	return icon
+}()
