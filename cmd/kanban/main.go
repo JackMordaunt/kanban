@@ -6,9 +6,12 @@ import (
 	"image/color"
 	"log"
 	"os"
+	"path/filepath"
+	"strconv"
 	"unsafe"
 
 	"git.sr.ht/~jackmordaunt/kanban"
+	"github.com/asdine/storm/v3"
 
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
@@ -27,26 +30,41 @@ import (
 )
 
 func main() {
-	w := app.NewWindow(app.Title("Kanban"))
-	th := material.NewTheme(gofont.Collection())
+	db, err := func() (*storm.DB, error) {
+		path := filepath.Join(os.TempDir(), "kanban.db")
+		fmt.Printf("%s\n", path)
+		var init = false
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			init = true
+		}
+		db, err := storm.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("opening data file: %w", err)
+		}
+		if err := db.Init(&kanban.Stage{}); err != nil {
+			return nil, err
+		}
+		if err := db.ReIndex(&kanban.Stage{}); err != nil {
+			return nil, err
+		}
+		if init {
+			for ii, stage := range []string{"Todo", "In Progress", "Testing", "Done"} {
+				if err := db.Save(&kanban.Stage{ID: ii + 1, Name: stage}); err != nil {
+					return nil, fmt.Errorf("creating default stages: %w", err)
+				}
+			}
+		}
+		return db, nil
+	}()
+	if err != nil {
+		log.Fatalf("error: initializing data: %v", err)
+	}
+	defer db.Close()
 	ui := &UI{
-		Window: w,
-		Th:     th,
+		Window: app.NewWindow(app.Title("Kanban")),
+		Th:     material.NewTheme(gofont.Collection()),
 		Kanban: &kanban.Kanban{
-			Stages: []kanban.Stage{
-				{
-					Name: "Todo",
-				},
-				{
-					Name: "In Progress",
-				},
-				{
-					Name: "Testing",
-				},
-				{
-					Name: "Done",
-				},
-			},
+			Store: db,
 		},
 		// TODO: render dynamically from storage.
 		Panels: []Panel{
@@ -143,11 +161,11 @@ func (ui *UI) Update(gtx C) {
 	if ui.TicketForm.Submit.Clicked() {
 		ticket, err := ui.TicketForm.Validate()
 		if err != nil {
-			fmt.Printf("error: %s", err)
+			fmt.Printf("error: %s\n", err)
 			return
 		}
 		if err := ui.Kanban.Assign(ui.TicketForm.Stage, ticket); err != nil {
-			fmt.Printf("error: %s", err)
+			fmt.Printf("error: assigning ticket: %s\n", err)
 			return
 		}
 		ui.TicketForm = TicketForm{}
@@ -171,7 +189,7 @@ func (ui *UI) Layout(gtx C) D {
 					stage, _ := ui.Kanban.Stage(panel.Label)
 					var cards = make([]layout.ListElement, len(stage.Tickets))
 					for ii, ticket := range stage.Tickets {
-						id := ticket.ID.String()
+						id := strconv.Itoa(ticket.ID)
 						cards[ii] = func(gtx C, ii int) D {
 							t := (*Ticket)(ui.TicketStates.Next(id, unsafe.Pointer(&Ticket{})))
 							t.Ticket = stage.Tickets[ii]
