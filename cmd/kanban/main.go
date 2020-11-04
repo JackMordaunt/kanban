@@ -15,8 +15,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -237,96 +235,6 @@ func (ui *UI) Layout(gtx C) D {
 	)
 }
 
-// Modal renders content centered with decorations.
-func Modal(gtx C, th *material.Theme, title string, content layout.Widget) D {
-	return Centered(gtx, func(gtx C) D {
-		gtx.Constraints.Max.X = int(float32(gtx.Constraints.Max.X) * 0.8)
-		return layout.Stack{}.Layout(
-			gtx,
-			layout.Expanded(func(gtx C) D {
-				return Rect{
-					Color: color.RGBA{R: 255, G: 255, B: 255, A: 255},
-					Size:  layout.FPt(gtx.Constraints.Min),
-					Radii: 4,
-				}.Layout(gtx)
-			}),
-			layout.Stacked(func(gtx C) D {
-				inset := layout.UniformInset(unit.Dp(10))
-				return layout.Flex{
-					Axis: layout.Vertical,
-				}.Layout(
-					gtx,
-					layout.Rigid(func(gtx C) D {
-						return layout.Stack{}.Layout(
-							gtx,
-							layout.Expanded(func(gtx C) D {
-								return Rect{
-									Color: color.RGBA{A: 100},
-									Size: f32.Point{
-										X: float32(gtx.Constraints.Max.X),
-										Y: float32(gtx.Constraints.Min.Y),
-									},
-								}.Layout(gtx)
-							}),
-							layout.Stacked(func(gtx C) D {
-								return inset.Layout(gtx, func(gtx C) D {
-									return material.H6(th, title).Layout(gtx)
-								})
-							}),
-						)
-					}),
-					layout.Rigid(func(gtx C) D {
-						return inset.Layout(gtx, func(gtx C) D {
-							return content(gtx)
-						})
-					}),
-				)
-			}),
-		)
-	})
-}
-
-func Centered(gtx C, content layout.Widget) D {
-	return layout.Stack{}.Layout(
-		gtx,
-		layout.Stacked(func(gtx C) D {
-			return Rect{
-				Size:  layout.FPt(gtx.Constraints.Max),
-				Color: color.RGBA{A: 200},
-			}.Layout(gtx)
-		}),
-		layout.Stacked(func(gtx C) D {
-			return layout.Flex{
-				Axis: layout.Horizontal,
-			}.Layout(
-				gtx,
-				layout.Flexed(1, func(gtx C) D {
-					return D{Size: gtx.Constraints.Min}
-				}),
-				layout.Rigid(func(gtx C) D {
-					return layout.Flex{
-						Axis: layout.Vertical,
-					}.Layout(
-						gtx,
-						layout.Flexed(1, func(gtx C) D {
-							return D{Size: gtx.Constraints.Min}
-						}),
-						layout.Rigid(func(gtx C) D {
-							return content(gtx)
-						}),
-						layout.Flexed(1, func(gtx C) D {
-							return D{Size: gtx.Constraints.Min}
-						}),
-					)
-				}),
-				layout.Flexed(1, func(gtx C) D {
-					return D{Size: gtx.Constraints.Min}
-				}),
-			)
-		}),
-	)
-}
-
 // TicketForm renders the form for ticket information.
 type TicketForm struct {
 	Stage    string
@@ -393,21 +301,6 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 			})
 		}),
 	)
-}
-
-// Rect creates a rectangle of the provided background color with
-// Dimensions specified by size and a corner radius (on all corners)
-// specified by radii.
-type Rect struct {
-	Color color.RGBA
-	Size  f32.Point
-	Radii float32
-}
-
-// Layout renders the Rect into the provided context
-func (r Rect) Layout(gtx C) D {
-	paint.FillShape(gtx.Ops, clip.UniformRRect(f32.Rectangle{Max: r.Size}, r.Radii).Op(gtx.Ops), r.Color)
-	return layout.Dimensions{Size: image.Pt(int(r.Size.X), int(r.Size.Y))}
 }
 
 // Panel can hold cards.
@@ -648,100 +541,4 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 			)
 		}),
 	)
-}
-
-// Map of arbitrary data.
-type Map struct {
-	data map[string]unsafe.Pointer
-}
-
-func (m *Map) Begin() {
-	if m.data == nil {
-		m.data = make(map[string]unsafe.Pointer)
-	}
-}
-
-func (m *Map) Next(k string, v unsafe.Pointer) unsafe.Pointer {
-	if _, ok := m.data[k]; !ok {
-		m.data[k] = v
-	}
-	return m.data[k]
-}
-
-func (m *Map) List() []unsafe.Pointer {
-	list := []unsafe.Pointer{}
-	for _, v := range m.data {
-		if v != nil {
-			list = append(list, v)
-		}
-	}
-	return list
-}
-
-// Button renders a clickable button.
-func Button(
-	state *widget.Clickable,
-	opt ...ButtonOption,
-) ButtonStyle {
-	btn := ButtonStyle{}
-	btn.IconButtonStyle.Button = state
-	btn.ButtonStyle.Button = state
-	for _, opt := range opt {
-		opt(&btn)
-	}
-	return btn
-}
-
-// ButtonStyle provides a unified api for both icon buttons and text buttons.
-type ButtonStyle struct {
-	material.IconButtonStyle
-	material.ButtonStyle
-}
-
-func (btn ButtonStyle) Layout(gtx C) D {
-	if btn.Icon != nil {
-		return btn.IconButtonStyle.Layout(gtx)
-	}
-	return btn.ButtonStyle.Layout(gtx)
-}
-
-type ButtonOption func(*ButtonStyle)
-
-func WithSize(sz unit.Value) ButtonOption {
-	return func(btn *ButtonStyle) {
-		btn.Size = sz
-	}
-}
-
-func WithIconColor(c color.RGBA) ButtonOption {
-	return func(btn *ButtonStyle) {
-		btn.IconButtonStyle.Color = c
-		btn.ButtonStyle.Color = c
-	}
-}
-
-func WithBgColor(c color.RGBA) ButtonOption {
-	return func(btn *ButtonStyle) {
-		btn.IconButtonStyle.Background = c
-		btn.ButtonStyle.Background = c
-	}
-}
-
-func WithIcon(icon *widget.Icon) ButtonOption {
-	return func(btn *ButtonStyle) {
-		btn.Icon = icon
-	}
-}
-
-func WithText(txt string) ButtonOption {
-	return func(btn *ButtonStyle) {
-		btn.Text = txt
-	}
-}
-
-func WithInset(inset layout.Inset) ButtonOption {
-	return func(btn *ButtonStyle) {
-		btn.IconButtonStyle.Inset = inset
-		btn.ButtonStyle.Inset = inset
-	}
 }
