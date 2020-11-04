@@ -157,6 +157,17 @@ func (ui *UI) Update(gtx C) {
 				fmt.Printf("error: %s\n", err)
 			}
 		}
+		if state.EditButton.Clicked() {
+			ui.TicketForm.ID = state.ID
+			ui.TicketForm.Title.SetText(state.Title)
+			ui.TicketForm.Category.SetText(state.Category)
+			ui.TicketForm.Summary.SetText(state.Summary)
+			ui.TicketForm.Details.SetText(state.Details)
+			// ui.TicketForm.References.SetText(state.References)
+			ui.Modal = func(gtx C) D {
+				return ui.TicketForm.Layout(gtx, ui.Th, "")
+			}
+		}
 	}
 	if ui.TicketForm.Submit.Clicked() {
 		ticket, err := ui.TicketForm.Validate()
@@ -164,9 +175,16 @@ func (ui *UI) Update(gtx C) {
 			fmt.Printf("error: %s\n", err)
 			return
 		}
-		if err := ui.Kanban.Assign(ui.TicketForm.Stage, ticket); err != nil {
-			fmt.Printf("error: assigning ticket: %s\n", err)
-			return
+		if assign := ui.TicketForm.Stage != ""; assign {
+			if err := ui.Kanban.Assign(ui.TicketForm.Stage, ticket); err != nil {
+				fmt.Printf("error: assigning ticket: %s\n", err)
+				return
+			}
+		} else {
+			if err := ui.Kanban.Update(ticket); err != nil {
+				fmt.Printf("error: updating ticket: %s\n", err)
+				return
+			}
 		}
 		ui.TicketForm = TicketForm{}
 		ui.Modal = nil
@@ -312,6 +330,7 @@ func Centered(gtx C, content layout.Widget) D {
 // TicketForm renders the form for ticket information.
 type TicketForm struct {
 	Stage    string
+	ID       int
 	Title    materials.TextField
 	Category materials.TextField
 	Summary  materials.TextField
@@ -322,6 +341,7 @@ type TicketForm struct {
 
 func (form TicketForm) Validate() (kanban.Ticket, error) {
 	ticket := kanban.Ticket{
+		ID:       form.ID,
 		Title:    form.Title.Text(),
 		Details:  form.Details.Text(),
 		Summary:  form.Summary.Text(),
