@@ -377,14 +377,9 @@ func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.ListElement)
 						p.List.Axis = layout.Vertical
 						return p.List.Layout(gtx, len(tickets), func(gtx C, ii int) D {
 							return layout.UniformInset(unit.Dp(10)).Layout(gtx, func(gtx C) D {
-								gtx.Constraints.Max.Y = gtx.Px(unit.Dp(100))
-								return widget.Border{
-									Width: unit.Dp(0.5),
-									Color: color.RGBA{A: 200},
-								}.Layout(gtx, func(gtx C) D {
-									return tickets[ii](gtx, ii)
-								})
+								return tickets[ii](gtx, ii)
 							})
+
 						})
 					}),
 				)
@@ -404,66 +399,30 @@ type Ticket struct {
 }
 
 func (t *Ticket) Layout(gtx C, th *material.Theme) D {
-	return layout.Flex{
-		Axis: layout.Horizontal,
-	}.Layout(
-		gtx,
-		layout.Rigid(func(gtx C) D {
-			gtx.Constraints.Max = image.Point{
-				X: gtx.Px(unit.Dp(25)),
-				Y: gtx.Constraints.Max.Y,
-			}
-			leftBarColor := color.RGBA{G: 100, B: 200, A: 255}
-			return layout.Stack{}.Layout(
-				gtx,
-				layout.Expanded(func(gtx C) D {
-					return Rect{
-						Color: leftBarColor,
-						Size: f32.Point{
-							X: float32(gtx.Constraints.Min.X),
-							Y: float32(gtx.Constraints.Max.Y),
-						},
-					}.Layout(gtx)
-				}),
-				layout.Stacked(func(gtx C) D {
-					return layout.Flex{
-						Axis: layout.Vertical,
-					}.Layout(
-						gtx,
-						layout.Rigid(func(gtx C) D {
-							return Button(
-								&t.EditButton,
-								WithIcon(icons.ContentEdit),
-								WithSize(unit.Dp(18)),
-								WithInset(layout.UniformInset(unit.Dp(3))),
-								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
-								WithBgColor(leftBarColor),
-							).Layout(gtx)
-						}),
-						layout.Rigid(func(gtx C) D {
-							return Button(
-								&t.DeleteButton,
-								WithIcon(icons.ContentDelete),
-								WithSize(unit.Dp(18)),
-								WithInset(layout.UniformInset(unit.Dp(3))),
-								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
-								WithBgColor(leftBarColor),
-							).Layout(gtx)
-						}),
-					)
-				}),
-			)
-		}),
-		layout.Flexed(1, func(gtx C) D {
+	var (
+		barThickness   = unit.Dp(25)
+		sizeBarColor   = color.RGBA{R: 50, G: 50, B: 50, A: 255}
+		bottomBarColor = color.RGBA{R: 220, G: 220, B: 220, A: 255}
+		minContentSize = gtx.Px(unit.Dp(150))
+	)
+	return widget.Border{
+		Width: unit.Dp(0.5),
+		Color: color.RGBA{A: 200},
+	}.Layout(gtx, func(gtx C) D {
+		dims := layout.Inset{
+			Left: unit.Dp(25),
+		}.Layout(gtx, func(gtx C) D {
 			return layout.Flex{
 				Axis: layout.Vertical,
 			}.Layout(
 				gtx,
-				layout.Flexed(1, func(gtx C) D {
+				layout.Rigid(func(gtx C) D {
+					gtx.Constraints.Min.Y = minContentSize
 					return layout.Inset{
-						Top:   unit.Dp(5),
-						Left:  unit.Dp(10),
-						Right: unit.Dp(10),
+						Top:    unit.Dp(5),
+						Bottom: unit.Dp(5),
+						Left:   unit.Dp(10),
+						Right:  unit.Dp(10),
 					}.Layout(gtx, func(gtx C) D {
 						return layout.Flex{
 							Axis: layout.Vertical,
@@ -492,9 +451,8 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 				layout.Rigid(func(gtx C) D {
 					gtx.Constraints.Max = image.Point{
 						X: gtx.Constraints.Max.X,
-						Y: gtx.Px(unit.Dp(25)),
+						Y: gtx.Px(barThickness),
 					}
-					bottomBarColor := color.RGBA{R: 220, G: 220, B: 220, A: 255}
 					return layout.Stack{}.Layout(
 						gtx,
 						layout.Expanded(func(gtx C) D {
@@ -539,6 +497,51 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 					)
 				}),
 			)
-		}),
-	)
+		})
+		layout.Stack{}.Layout(
+			gtx,
+			layout.Stacked(func(gtx C) D {
+				Rect{
+					Color: sizeBarColor,
+					Size: f32.Point{
+						X: float32(gtx.Px(barThickness)),
+						Y: float32(dims.Size.Y),
+					},
+				}.Layout(gtx)
+				return D{}
+			}),
+			layout.Stacked(func(gtx C) D {
+				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
+					return layout.Flex{
+						Axis: layout.Vertical,
+					}.Layout(
+						gtx,
+						layout.Rigid(func(gtx C) D {
+							return Button(
+								&t.EditButton,
+								WithIcon(icons.ContentEdit),
+								WithSize(unit.Dp(16)),
+								WithInset(layout.UniformInset(unit.Dp(2))),
+								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+								WithBgColor(sizeBarColor),
+							).Layout(gtx)
+						}),
+						layout.Rigid(func(gtx C) D {
+							return layout.Inset{Top: unit.Dp(4)}.Layout(gtx, func(gtx C) D {
+								return Button(
+									&t.DeleteButton,
+									WithIcon(icons.ContentDelete),
+									WithSize(unit.Dp(16)),
+									WithInset(layout.UniformInset(unit.Dp(2))),
+									WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+									WithBgColor(sizeBarColor),
+								).Layout(gtx)
+							})
+						}),
+					)
+				})
+			}),
+		)
+		return dims
+	})
 }
