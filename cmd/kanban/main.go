@@ -155,6 +155,9 @@ func (ui *UI) Update(gtx C) {
 	}
 	for s, ok := ui.TicketStates.Next(); ok; s, ok = ui.TicketStates.Next() {
 		t := (*Ticket)(s)
+		if ui.Modal != nil {
+			continue
+		}
 		if t.NextButton.Clicked() {
 			if err := ui.Kanban.Progress(t.ID); err != nil {
 				fmt.Printf("error: %s\n", err)
@@ -186,7 +189,6 @@ func (ui *UI) Update(gtx C) {
 			}
 		}
 		if t.Content.Clicked() {
-			// show detailed content.
 			ui.TicketDetails.Ticket = t.Ticket
 			ui.Modal = func(gtx C) D {
 				return Card{

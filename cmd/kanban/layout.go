@@ -57,7 +57,6 @@ func (c Card) Layout(gtx C, th *material.Theme, w layout.Widget) D {
 			)
 		}),
 	)
-
 }
 
 // Modal renders content centered on a translucent scrim.
