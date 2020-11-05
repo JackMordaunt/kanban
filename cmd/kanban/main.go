@@ -318,7 +318,10 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 						return D{Size: gtx.Constraints.Min}
 					}),
 					layout.Rigid(func(gtx C) D {
-						return material.Button(th, &form.Cancel, "Cancel").Layout(gtx)
+						btn := material.Button(th, &form.Cancel, "Cancel")
+						btn.Color = th.Color.Primary
+						btn.Background = color.RGBA{}
+						return btn.Layout(gtx)
 					}),
 					layout.Rigid(func(gtx C) D {
 						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
@@ -366,15 +369,18 @@ func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
 						return D{Size: gtx.Constraints.Min}
 					}),
 					layout.Rigid(func(gtx C) D {
-						return material.Button(th, &d.Cancel, "Cancel").Layout(gtx)
+						btn := material.Button(th, &d.Cancel, "Cancel")
+						btn.Color = th.Color.Primary
+						btn.Background = color.RGBA{}
+						return btn.Layout(gtx)
 					}),
 					layout.Rigid(func(gtx C) D {
 						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
 					}),
 					layout.Rigid(func(gtx C) D {
-						th := *th
-						th.Color.Primary = color.RGBA{R: 200, A: 255}
-						return material.Button(&th, &d.Ok, "Delete").Layout(gtx)
+						btn := material.Button(th, &d.Ok, "Delete")
+						btn.Background = color.RGBA{R: 200, A: 255}
+						return btn.Layout(gtx)
 					}),
 				)
 			})
