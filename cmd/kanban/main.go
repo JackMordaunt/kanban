@@ -114,6 +114,7 @@ type UI struct {
 	TicketStates Map
 	Modal        layout.Widget
 	TicketForm   TicketForm
+	DeleteDialog DeleteDialog
 }
 
 func (ui *UI) Loop() error {
@@ -140,31 +141,49 @@ func (ui *UI) Update(gtx C) {
 		panel := &ui.Panels[ii]
 		if panel.CreateTicket.Clicked() {
 			ui.Modal = func(gtx C) D {
-				return ui.TicketForm.Layout(gtx, ui.Th, panel.Label)
+				return Card{
+					Title: "Add Ticket",
+				}.Layout(gtx, ui.Th, func(gtx C) D {
+					return ui.TicketForm.Layout(gtx, ui.Th, panel.Label)
+				})
 			}
 		}
 	}
-	for _, state := range ui.TicketStates.List() {
-		state := (*Ticket)(state)
-		if state.NextButton.Clicked() {
-			if err := ui.Kanban.Progress(state.ID); err != nil {
+	for s, ok := ui.TicketStates.Next(); ok; s, ok = ui.TicketStates.Next() {
+		t := (*Ticket)(s)
+		if t.NextButton.Clicked() {
+			if err := ui.Kanban.Progress(t.ID); err != nil {
 				fmt.Printf("error: %s\n", err)
 			}
 		}
-		if state.PrevButton.Clicked() {
-			if err := ui.Kanban.Regress(state.ID); err != nil {
+		if t.PrevButton.Clicked() {
+			if err := ui.Kanban.Regress(t.ID); err != nil {
 				fmt.Printf("error: %s\n", err)
 			}
 		}
-		if state.EditButton.Clicked() {
-			ui.TicketForm.ID = state.ID
-			ui.TicketForm.Title.SetText(state.Title)
-			ui.TicketForm.Category.SetText(state.Category)
-			ui.TicketForm.Summary.SetText(state.Summary)
-			ui.TicketForm.Details.SetText(state.Details)
-			// ui.TicketForm.References.SetText(state.References)
+		if t.EditButton.Clicked() {
+			ui.TicketForm.ID = t.ID
+			ui.TicketForm.Title.SetText(t.Title)
+			ui.TicketForm.Category.SetText(t.Category)
+			ui.TicketForm.Summary.SetText(t.Summary)
+			ui.TicketForm.Details.SetText(t.Details)
+			// ui.TicketForm.References.SetText(t.References)
 			ui.Modal = func(gtx C) D {
-				return ui.TicketForm.Layout(gtx, ui.Th, "")
+				return Card{
+					Title: "Edit Ticket",
+				}.Layout(gtx, ui.Th, func(gtx C) D {
+					return ui.TicketForm.Layout(gtx, ui.Th, "")
+				})
+			}
+		}
+		if t.DeleteButton.Clicked() {
+			ui.DeleteDialog.Ticket = t.Ticket
+			ui.Modal = func(gtx C) D {
+				return Card{
+					Title: "Delete Ticket",
+				}.Layout(gtx, ui.Th, func(gtx C) D {
+					return ui.DeleteDialog.Layout(gtx, ui.Th)
+				})
 			}
 		}
 	}
@@ -192,6 +211,15 @@ func (ui *UI) Update(gtx C) {
 		ui.TicketForm = TicketForm{}
 		ui.Modal = nil
 	}
+	if ui.DeleteDialog.Ok.Clicked() {
+		if err := ui.Kanban.Delete(ui.DeleteDialog.ID); err != nil {
+			fmt.Printf("error: %s\n", err)
+		}
+		ui.Modal = nil
+	}
+	if ui.DeleteDialog.Cancel.Clicked() {
+		ui.Modal = nil
+	}
 }
 
 func (ui *UI) Layout(gtx C) D {
@@ -208,7 +236,7 @@ func (ui *UI) Layout(gtx C) D {
 					for ii, ticket := range stage.Tickets {
 						id := strconv.Itoa(ticket.ID)
 						cards[ii] = func(gtx C, ii int) D {
-							t := (*Ticket)(ui.TicketStates.Next(id, unsafe.Pointer(&Ticket{})))
+							t := (*Ticket)(ui.TicketStates.New(id, unsafe.Pointer(&Ticket{})))
 							t.Ticket = stage.Tickets[ii]
 							t.Stage = stage.Name
 							return t.Layout(gtx, ui.Th)
@@ -229,7 +257,7 @@ func (ui *UI) Layout(gtx C) D {
 			if ui.Modal == nil {
 				return D{}
 			}
-			return Modal(gtx, ui.Th, "Add Ticket", func(gtx C) D {
+			return Modal(gtx, func(gtx C) D {
 				return ui.Modal(gtx)
 			})
 		}),
@@ -302,6 +330,57 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 			})
 		}),
 	)
+}
+
+// DeleteDialog prompts the user with an option to delete a ticket.
+type DeleteDialog struct {
+	kanban.Ticket
+	Ok     widget.Clickable
+	Cancel widget.Clickable
+}
+
+func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
+	return layout.Flex{
+		Axis:      layout.Vertical,
+		Alignment: layout.Middle,
+	}.Layout(
+		gtx,
+		layout.Rigid(func(gtx C) D {
+			return layout.Center.Layout(gtx, func(gtx C) D {
+				return material.Body1(
+					th,
+					fmt.Sprintf("Are you sure you want to delete ticket %q?", d.Title),
+				).Layout(gtx)
+			})
+		}),
+		layout.Rigid(func(gtx C) D {
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
+			return layout.Inset{
+				Top: unit.Dp(10),
+			}.Layout(gtx, func(gtx C) D {
+				return layout.Flex{
+					Axis: layout.Horizontal,
+				}.Layout(
+					gtx,
+					layout.Flexed(1, func(gtx C) D {
+						return D{Size: gtx.Constraints.Min}
+					}),
+					layout.Rigid(func(gtx C) D {
+						return material.Button(th, &d.Cancel, "Cancel").Layout(gtx)
+					}),
+					layout.Rigid(func(gtx C) D {
+						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
+					}),
+					layout.Rigid(func(gtx C) D {
+						th := *th
+						th.Color.Primary = color.RGBA{R: 200, A: 255}
+						return material.Button(&th, &d.Ok, "Delete").Layout(gtx)
+					}),
+				)
+			})
+		}),
+	)
+
 }
 
 // Panel can hold cards.
