@@ -2,6 +2,7 @@ package kanban
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/asdine/storm/v3"
 )
@@ -9,6 +10,24 @@ import (
 // Kanban manipulates the model.
 type Kanban struct {
 	Store *storm.DB
+}
+
+// Stage in the kanban pipeline, can hold a number of tickets.
+type Stage struct {
+	ID      int `storm:"id,index"`
+	Name    string
+	Tickets []Ticket
+}
+
+// Ticket in a stage.
+type Ticket struct {
+	ID         int
+	Title      string
+	Category   string
+	Summary    string
+	Details    string
+	References []int
+	Created    time.Time
 }
 
 // ListStages returns a list of stages.
@@ -136,11 +155,14 @@ func (k *Kanban) StageFor(ticket int) (string, error) {
 }
 
 func (k *Kanban) Assign(name string, ticket Ticket) error {
-	id, err := k.nextID()
-	if err != nil {
-		return fmt.Errorf("generating ID: %w", err)
+	if ticket.ID == 0 {
+		id, err := k.nextID()
+		if err != nil {
+			return fmt.Errorf("generating ID: %w", err)
+		}
+		ticket.ID = id
+		ticket.Created = time.Now()
 	}
-	ticket.ID = id
 	stage, err := k.Stage(name)
 	if err != nil {
 		return fmt.Errorf("finding stage: %w", err)
@@ -196,21 +218,4 @@ func (k *Kanban) nextID() (int, error) {
 		}
 	}
 	return max + 1, nil
-}
-
-// Stage in the kanban pipeline, can hold a number of tickets.
-type Stage struct {
-	ID      int `storm:"id,index"`
-	Name    string
-	Tickets []Ticket
-}
-
-// Ticket in a stage.
-type Ticket struct {
-	ID         int
-	Title      string
-	Category   string
-	Summary    string
-	Details    string
-	References []int
 }

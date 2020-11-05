@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 	"unsafe"
 
 	"git.sr.ht/~jackmordaunt/kanban"
@@ -466,13 +467,28 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 						}),
 						layout.Stacked(func(gtx C) D {
 							return layout.Flex{
-								Axis: layout.Horizontal,
+								Axis:      layout.Horizontal,
+								Alignment: layout.Middle,
 							}.Layout(
 								gtx,
-								layout.Flexed(1, func(gtx C) D {
-									return D{Size: gtx.Constraints.Max}
+								layout.Rigid(func(gtx C) D {
+									return layout.Inset{
+										Left: unit.Px(10),
+									}.Layout(gtx, func(gtx C) D {
+										return material.Label(th, unit.Dp(10), func() string {
+											d := time.Since(t.Created)
+											d = d.Round(time.Minute)
+											h := d / time.Hour
+											d -= h * time.Hour
+											m := d / time.Minute
+											return fmt.Sprintf("%02d:%02d", h, m)
+										}()).Layout(gtx)
+									})
 								}),
 								layout.Flexed(1, func(gtx C) D {
+									return D{Size: gtx.Constraints.Min}
+								}),
+								layout.Rigid(func(gtx C) D {
 									return Button(
 										&t.PrevButton,
 										WithIcon(icons.BackIcon),
@@ -482,7 +498,7 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 										WithBgColor(bottomBarColor),
 									).Layout(gtx)
 								}),
-								layout.Flexed(1, func(gtx C) D {
+								layout.Rigid(func(gtx C) D {
 									return Button(
 										&t.NextButton,
 										WithIcon(icons.ForwardIcon),
