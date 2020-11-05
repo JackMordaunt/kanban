@@ -108,13 +108,14 @@ type (
 // this object.
 type UI struct {
 	*app.Window
-	Kanban       *kanban.Kanban
-	Th           *material.Theme
-	Panels       []Panel
-	TicketStates Map
-	Modal        layout.Widget
-	TicketForm   TicketForm
-	DeleteDialog DeleteDialog
+	Kanban        *kanban.Kanban
+	Th            *material.Theme
+	Panels        []Panel
+	TicketStates  Map
+	Modal         layout.Widget
+	TicketForm    TicketForm
+	TicketDetails TicketDetails
+	DeleteDialog  DeleteDialog
 }
 
 func (ui *UI) Loop() error {
@@ -184,6 +185,17 @@ func (ui *UI) Update(gtx C) {
 				})
 			}
 		}
+		if t.Content.Clicked() {
+			// show detailed content.
+			ui.TicketDetails.Ticket = t.Ticket
+			ui.Modal = func(gtx C) D {
+				return Card{
+					Title: fmt.Sprintf("%q", t.Title),
+				}.Layout(gtx, ui.Th, func(gtx C) D {
+					return ui.TicketDetails.Layout(gtx, ui.Th)
+				})
+			}
+		}
 	}
 	if ui.TicketForm.Submit.Clicked() {
 		ticket, err := ui.TicketForm.Validate()
@@ -216,6 +228,20 @@ func (ui *UI) Update(gtx C) {
 		ui.Modal = nil
 	}
 	if ui.DeleteDialog.Cancel.Clicked() {
+		ui.Modal = nil
+	}
+	if ui.TicketDetails.Edit.Clicked() {
+		ui.TicketForm.Set(ui.TicketDetails.Ticket)
+		ui.Modal = func(gtx C) D {
+			return Card{
+				Title: "Edit Ticket",
+			}.Layout(gtx, ui.Th, func(gtx C) D {
+				return ui.TicketForm.Layout(gtx, ui.Th, "")
+			})
+		}
+	}
+	if ui.TicketDetails.Cancel.Clicked() {
+		ui.TicketForm = TicketForm{}
 		ui.Modal = nil
 	}
 }
@@ -497,6 +523,7 @@ type Ticket struct {
 	PrevButton   widget.Clickable
 	EditButton   widget.Clickable
 	DeleteButton widget.Clickable
+	Content      widget.Clickable
 }
 
 // Layout the ticket card.
@@ -587,13 +614,22 @@ func (t *Ticket) content(gtx C, th *material.Theme) D {
 		)
 	})
 	call := macro.Stop()
-	Rect{
-		Color: color.RGBA{R: 255, G: 255, B: 255, A: 255},
-		Size: layout.FPt(image.Point{
-			X: gtx.Constraints.Max.X,
-			Y: dims.Size.Y,
+	layout.Stack{}.Layout(
+		gtx,
+		layout.Stacked(func(gtx C) D {
+			return Rect{
+				Color: color.RGBA{R: 255, G: 255, B: 255, A: 255},
+				Size: layout.FPt(image.Point{
+					X: gtx.Constraints.Max.X,
+					Y: dims.Size.Y,
+				}),
+			}.Layout(gtx)
+
 		}),
-	}.Layout(gtx)
+		layout.Expanded(func(gtx C) D {
+			return t.Content.Layout(gtx)
+		}),
+	)
 	call.Add(gtx.Ops)
 	return dims
 }
@@ -692,6 +728,51 @@ func (t *Ticket) sideBar(gtx C, sz image.Point, c color.RGBA) D {
 								WithBgColor(c),
 							).Layout(gtx)
 						})
+					}),
+				)
+			})
+		}),
+	)
+}
+
+// TicketDetails renders the read-only long form details of a ticket.
+type TicketDetails struct {
+	kanban.Ticket
+	Edit   widget.Clickable
+	Cancel widget.Clickable
+}
+
+func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
+	return layout.Flex{
+		Axis: layout.Vertical,
+	}.Layout(
+		gtx,
+		layout.Rigid(func(gtx C) D {
+			return material.Body1(th, t.Details).Layout(gtx)
+		}),
+		layout.Rigid(func(gtx C) D {
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
+			return layout.Inset{
+				Top: unit.Dp(10),
+			}.Layout(gtx, func(gtx C) D {
+				return layout.Flex{
+					Axis: layout.Horizontal,
+				}.Layout(
+					gtx,
+					layout.Flexed(1, func(gtx C) D {
+						return D{Size: gtx.Constraints.Min}
+					}),
+					layout.Rigid(func(gtx C) D {
+						btn := material.Button(th, &t.Cancel, "Cancel")
+						btn.Color = th.Color.Primary
+						btn.Background = color.RGBA{}
+						return btn.Layout(gtx)
+					}),
+					layout.Rigid(func(gtx C) D {
+						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
+					}),
+					layout.Rigid(func(gtx C) D {
+						return material.Button(th, &t.Edit, "Edit").Layout(gtx)
 					}),
 				)
 			})
