@@ -162,12 +162,7 @@ func (ui *UI) Update(gtx C) {
 			}
 		}
 		if t.EditButton.Clicked() {
-			ui.TicketForm.ID = t.ID
-			ui.TicketForm.Title.SetText(t.Title)
-			ui.TicketForm.Category.SetText(t.Category)
-			ui.TicketForm.Summary.SetText(t.Summary)
-			ui.TicketForm.Details.SetText(t.Details)
-			// ui.TicketForm.References.SetText(t.References)
+			ui.TicketForm.Set(t.Ticket)
 			ui.Modal = func(gtx C) D {
 				return Card{
 					Title: "Edit Ticket",
@@ -267,7 +262,7 @@ func (ui *UI) Layout(gtx C) D {
 // TicketForm renders the form for ticket information.
 type TicketForm struct {
 	Stage    string
-	ID       int
+	Data     kanban.Ticket
 	Title    materials.TextField
 	Category materials.TextField
 	Summary  materials.TextField
@@ -276,9 +271,19 @@ type TicketForm struct {
 	Cancel   widget.Clickable
 }
 
+func (form *TicketForm) Set(t kanban.Ticket) {
+	form.Data = t
+	form.Title.SetText(t.Title)
+	form.Category.SetText(t.Category)
+	form.Summary.SetText(t.Summary)
+	form.Details.SetText(t.Details)
+	// form.References.SetText(t.References)
+}
+
 func (form TicketForm) Validate() (kanban.Ticket, error) {
 	ticket := kanban.Ticket{
-		ID:       form.ID,
+		ID:       form.Data.ID,
+		Created:  form.Data.Created,
 		Title:    form.Title.Text(),
 		Details:  form.Details.Text(),
 		Summary:  form.Summary.Text(),
