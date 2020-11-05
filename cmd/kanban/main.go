@@ -69,22 +69,22 @@ func main() {
 		Panels: []Panel{
 			{
 				Label:     "Todo",
-				Color:     color.RGBA{R: 220, G: 220, B: 220, A: 255},
+				Color:     color.RGBA{R: 0x91, G: 0x81, B: 0x8a, A: 220},
 				Thickness: unit.Dp(50),
 			},
 			{
 				Label:     "In Progress",
-				Color:     color.RGBA{G: 100, B: 200, A: 255},
+				Color:     color.RGBA{R: 0, G: 100, B: 200, A: 220},
 				Thickness: unit.Dp(50),
 			},
 			{
 				Label:     "Testing",
-				Color:     color.RGBA{R: 200, G: 100, A: 255},
+				Color:     color.RGBA{R: 200, G: 100, B: 0, A: 220},
 				Thickness: unit.Dp(50),
 			},
 			{
 				Label:     "Done",
-				Color:     color.RGBA{R: 50, G: 200, B: 100, A: 255},
+				Color:     color.RGBA{R: 50, G: 200, B: 100, A: 220},
 				Thickness: unit.Dp(50),
 			},
 		},
@@ -433,11 +433,14 @@ func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.ListElement)
 									return D{Size: gtx.Constraints.Min}
 								}),
 								layout.Rigid(func(gtx C) D {
-									gtx.Constraints.Max = image.Point{
-										X: gtx.Px(unit.Dp(10)),
-										Y: gtx.Px(unit.Dp(10)),
-									}
-									return material.IconButton(th, &p.CreateTicket, icons.ContentAdd).Layout(gtx)
+									return Button(
+										&p.CreateTicket,
+										WithIcon(icons.ContentAdd),
+										WithSize(unit.Dp(15)),
+										WithInset(layout.UniformInset(unit.Dp(6))),
+										WithBgColor(color.RGBA{}),
+										WithIconColor(th.Color.Text),
+									).Layout(gtx)
 								}),
 							)
 						})
