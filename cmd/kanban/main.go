@@ -399,10 +399,19 @@ type Ticket struct {
 	DeleteButton widget.Clickable
 }
 
+// Layout the ticket card.
+//
+// The layouting here was actually quite tricky because `layout.List` simulates
+// an infinite Y axis. That means you can just specify a max Y constraint. This
+// makes expanding stacked content vertically impossible with a naive use of
+// `layout.Stack`.
+//
+// To get around this I used a macro and manually stacked things sized exactly
+// to the content, rather than the maximum Y.
 func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 	var (
 		barThickness   = unit.Dp(25)
-		sizeBarColor   = color.RGBA{R: 50, G: 50, B: 50, A: 255}
+		sideBarColor   = color.RGBA{R: 50, G: 50, B: 50, A: 255}
 		bottomBarColor = color.RGBA{R: 220, G: 220, B: 220, A: 255}
 		minContentSize = gtx.Px(unit.Dp(150))
 	)
@@ -419,145 +428,173 @@ func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 				gtx,
 				layout.Rigid(func(gtx C) D {
 					gtx.Constraints.Min.Y = minContentSize
-					return layout.Inset{
-						Top:    unit.Dp(5),
-						Bottom: unit.Dp(5),
-						Left:   unit.Dp(10),
-						Right:  unit.Dp(10),
-					}.Layout(gtx, func(gtx C) D {
-						return layout.Flex{
-							Axis: layout.Vertical,
-						}.Layout(
-							gtx,
-							layout.Rigid(func(gtx C) D {
-								return material.Label(th, unit.Dp(20), t.Title).Layout(gtx)
-							}),
-							layout.Rigid(func(gtx C) D {
-								return layout.Inset{
-									Top: unit.Dp(2),
-								}.Layout(gtx, func(gtx C) D {
-									th := *th
-									th.Color.Text = materials.AlphaMultiply(th.Color.Text, 200)
-									return material.Label(&th, unit.Dp(14), t.Category).Layout(gtx)
-								})
-							}),
-							layout.Rigid(func(gtx C) D {
-								return layout.Inset{Top: unit.Dp(10)}.Layout(gtx, func(gtx C) D {
-									return material.Body1(th, t.Summary).Layout(gtx)
-								})
-							}),
-						)
-					})
+					return t.content(gtx, th)
 				}),
 				layout.Rigid(func(gtx C) D {
-					gtx.Constraints.Max = image.Point{
-						X: gtx.Constraints.Max.X,
-						Y: gtx.Px(barThickness),
-					}
-					return layout.Stack{}.Layout(
+					return t.bottomBar(
 						gtx,
-						layout.Expanded(func(gtx C) D {
-							return Rect{
-								Color: bottomBarColor,
-								Size: f32.Point{
-									X: float32(gtx.Constraints.Max.X),
-									Y: float32(gtx.Constraints.Min.Y),
-								},
-							}.Layout(gtx)
-						}),
-						layout.Stacked(func(gtx C) D {
-							return layout.Flex{
-								Axis:      layout.Horizontal,
-								Alignment: layout.Middle,
-							}.Layout(
-								gtx,
-								layout.Rigid(func(gtx C) D {
-									return layout.Inset{
-										Left: unit.Px(10),
-									}.Layout(gtx, func(gtx C) D {
-										return material.Label(th, unit.Dp(10), func() string {
-											d := time.Since(t.Created)
-											d = d.Round(time.Minute)
-											h := d / time.Hour
-											d -= h * time.Hour
-											m := d / time.Minute
-											return fmt.Sprintf("%02d:%02d", h, m)
-										}()).Layout(gtx)
-									})
-								}),
-								layout.Flexed(1, func(gtx C) D {
-									return D{Size: gtx.Constraints.Min}
-								}),
-								layout.Rigid(func(gtx C) D {
-									return Button(
-										&t.PrevButton,
-										WithIcon(icons.BackIcon),
-										WithSize(unit.Dp(12)),
-										WithInset(layout.UniformInset(unit.Dp(6))),
-										WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
-										WithBgColor(bottomBarColor),
-									).Layout(gtx)
-								}),
-								layout.Rigid(func(gtx C) D {
-									return Button(
-										&t.NextButton,
-										WithIcon(icons.ForwardIcon),
-										WithSize(unit.Dp(12)),
-										WithInset(layout.UniformInset(unit.Dp(6))),
-										WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
-										WithBgColor(bottomBarColor),
-									).Layout(gtx)
-								}),
-							)
-						}),
+						th,
+						image.Point{
+							X: gtx.Constraints.Max.X,
+							Y: gtx.Px(barThickness),
+						},
+						bottomBarColor,
 					)
 				}),
 			)
 		})
-		layout.Stack{}.Layout(
+		t.sideBar(
 			gtx,
-			layout.Stacked(func(gtx C) D {
-				Rect{
-					Color: sizeBarColor,
-					Size: f32.Point{
-						X: float32(gtx.Px(barThickness)),
-						Y: float32(dims.Size.Y),
-					},
-				}.Layout(gtx)
-				return D{}
-			}),
-			layout.Stacked(func(gtx C) D {
-				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
-					return layout.Flex{
-						Axis: layout.Vertical,
-					}.Layout(
-						gtx,
-						layout.Rigid(func(gtx C) D {
-							return Button(
-								&t.EditButton,
-								WithIcon(icons.ContentEdit),
-								WithSize(unit.Dp(16)),
-								WithInset(layout.UniformInset(unit.Dp(2))),
-								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
-								WithBgColor(sizeBarColor),
-							).Layout(gtx)
-						}),
-						layout.Rigid(func(gtx C) D {
-							return layout.Inset{Top: unit.Dp(4)}.Layout(gtx, func(gtx C) D {
-								return Button(
-									&t.DeleteButton,
-									WithIcon(icons.ContentDelete),
-									WithSize(unit.Dp(16)),
-									WithInset(layout.UniformInset(unit.Dp(2))),
-									WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
-									WithBgColor(sizeBarColor),
-								).Layout(gtx)
-							})
-						}),
-					)
-				})
-			}),
+			image.Point{
+				X: gtx.Px(barThickness),
+				Y: dims.Size.Y,
+			},
+			sideBarColor,
 		)
 		return dims
 	})
+}
+
+func (t *Ticket) content(gtx C, th *material.Theme) D {
+	macro := op.Record(gtx.Ops)
+	dims := layout.Inset{
+		Top:    unit.Dp(5),
+		Bottom: unit.Dp(5),
+		Left:   unit.Dp(10),
+		Right:  unit.Dp(10),
+	}.Layout(gtx, func(gtx C) D {
+		return layout.Flex{
+			Axis: layout.Vertical,
+		}.Layout(
+			gtx,
+			layout.Rigid(func(gtx C) D {
+				return material.Label(th, unit.Dp(20), t.Title).Layout(gtx)
+			}),
+			layout.Rigid(func(gtx C) D {
+				return layout.Inset{
+					Top: unit.Dp(2),
+				}.Layout(gtx, func(gtx C) D {
+					th := *th
+					th.Color.Text = materials.AlphaMultiply(th.Color.Text, 200)
+					return material.Label(&th, unit.Dp(14), t.Category).Layout(gtx)
+				})
+			}),
+			layout.Rigid(func(gtx C) D {
+				return layout.Inset{Top: unit.Dp(10)}.Layout(gtx, func(gtx C) D {
+					return material.Body1(th, t.Summary).Layout(gtx)
+				})
+			}),
+		)
+	})
+	call := macro.Stop()
+	Rect{
+		Color: color.RGBA{R: 255, G: 255, B: 255, A: 255},
+		Size: layout.FPt(image.Point{
+			X: gtx.Constraints.Max.X,
+			Y: dims.Size.Y,
+		}),
+	}.Layout(gtx)
+	call.Add(gtx.Ops)
+	return dims
+}
+
+func (t *Ticket) bottomBar(gtx C, th *material.Theme, sz image.Point, c color.RGBA) D {
+	return layout.Stack{}.Layout(
+		gtx,
+		layout.Expanded(func(gtx C) D {
+			return Rect{
+				Color: c,
+				Size:  layout.FPt(sz),
+			}.Layout(gtx)
+		}),
+		layout.Stacked(func(gtx C) D {
+			return layout.Flex{
+				Axis:      layout.Horizontal,
+				Alignment: layout.Middle,
+			}.Layout(
+				gtx,
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{
+						Left: unit.Px(10),
+					}.Layout(gtx, func(gtx C) D {
+						return material.Label(th, unit.Dp(10), func() string {
+							d := time.Since(t.Created)
+							d = d.Round(time.Minute)
+							h := d / time.Hour
+							d -= h * time.Hour
+							m := d / time.Minute
+							return fmt.Sprintf("%02d:%02d", h, m)
+						}()).Layout(gtx)
+					})
+				}),
+				layout.Flexed(1, func(gtx C) D {
+					return D{Size: gtx.Constraints.Min}
+				}),
+				layout.Rigid(func(gtx C) D {
+					return Button(
+						&t.PrevButton,
+						WithIcon(icons.BackIcon),
+						WithSize(unit.Dp(12)),
+						WithInset(layout.UniformInset(unit.Dp(6))),
+						WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
+						WithBgColor(c),
+					).Layout(gtx)
+				}),
+				layout.Rigid(func(gtx C) D {
+					return Button(
+						&t.NextButton,
+						WithIcon(icons.ForwardIcon),
+						WithSize(unit.Dp(12)),
+						WithInset(layout.UniformInset(unit.Dp(6))),
+						WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
+						WithBgColor(c),
+					).Layout(gtx)
+				}),
+			)
+		}),
+	)
+}
+
+func (t *Ticket) sideBar(gtx C, sz image.Point, c color.RGBA) D {
+	return layout.Stack{}.Layout(
+		gtx,
+		layout.Stacked(func(gtx C) D {
+			Rect{
+				Color: c,
+				Size:  layout.FPt(sz),
+			}.Layout(gtx)
+			return D{}
+		}),
+		layout.Stacked(func(gtx C) D {
+			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
+				return layout.Flex{
+					Axis: layout.Vertical,
+				}.Layout(
+					gtx,
+					layout.Rigid(func(gtx C) D {
+						return Button(
+							&t.EditButton,
+							WithIcon(icons.ContentEdit),
+							WithSize(unit.Dp(16)),
+							WithInset(layout.UniformInset(unit.Dp(2))),
+							WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+							WithBgColor(c),
+						).Layout(gtx)
+					}),
+					layout.Rigid(func(gtx C) D {
+						return layout.Inset{Top: unit.Dp(4)}.Layout(gtx, func(gtx C) D {
+							return Button(
+								&t.DeleteButton,
+								WithIcon(icons.ContentDelete),
+								WithSize(unit.Dp(16)),
+								WithInset(layout.UniformInset(unit.Dp(2))),
+								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+								WithBgColor(c),
+							).Layout(gtx)
+						})
+					}),
+				)
+			})
+		}),
+	)
 }
