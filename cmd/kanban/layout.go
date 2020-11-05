@@ -82,6 +82,7 @@ func Modal(gtx C, w layout.Widget) D {
 	)
 }
 
+// Centered places the widget in the center of the container.
 func Centered(gtx C, w layout.Widget) D {
 	return layout.Flex{
 		Axis: layout.Horizontal,

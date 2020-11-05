@@ -136,6 +136,9 @@ func (ui *UI) Loop() error {
 	}
 }
 
+// TODO: investigate best way to handle errors. Some errors are for the user
+// and others are for the devs.
+// Currently errors are just printed; not great for windowed applications.
 func (ui *UI) Update(gtx C) {
 	for ii := range ui.Panels {
 		panel := &ui.Panels[ii]
@@ -260,6 +263,8 @@ func (ui *UI) Layout(gtx C) D {
 }
 
 // TicketForm renders the form for ticket information.
+//
+// TODO: tab navigation through form fields.
 type TicketForm struct {
 	Stage    string
 	Data     kanban.Ticket
@@ -280,6 +285,8 @@ func (form *TicketForm) Set(t kanban.Ticket) {
 	// form.References.SetText(t.References)
 }
 
+// Validate the inputs.
+// Note: No actual validation is done yet.
 func (form TicketForm) Validate() (kanban.Ticket, error) {
 	ticket := kanban.Ticket{
 		ID:       form.Data.ID,
@@ -391,10 +398,10 @@ func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
 			})
 		}),
 	)
-
 }
 
 // Panel can hold cards.
+// One panel per stage in the kanban pipeline.
 // Has a title and action bar.
 type Panel struct {
 	Label        string
