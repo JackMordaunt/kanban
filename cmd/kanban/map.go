@@ -2,7 +2,7 @@ package main
 
 import "unsafe"
 
-// Map of arbitrary data to hold unorded state for `layout.List` items.
+// Map of arbitrary data to hold unordered state for `layout.List` items.
 // This allows Gio programs to re-use a buffer of states for lists items in
 // between frames. It is a grow-only buffer that expects entries to stabilise.
 //
@@ -15,12 +15,12 @@ import "unsafe"
 //
 // The caller only has to ensure that the type they initialise it with is the
 // type they attempt to cast out of it.
-// Since the scope of use is small, this invariant is straighforward to uphold.
+// Since the scope of use is small, this invariant is straightforward to uphold.
 //
-// Nonetheless, this style of API is primarily motived by re-use concerns when
+// Nonetheless, this style of API is primarily motivated by re-use concerns when
 // using common patterns in Gio (specifically `layout.List` state management).
 // The static approach would be to copy-paste the same structures with different
-// types everytime you have list state to manage.
+// types every time you have list state to manage.
 //
 // In light of Go generics incoming, this may become a moot issue. In the meantime
 // this remains an experimental API that functions as expected.
@@ -41,6 +41,8 @@ func (m *Map) Begin() {
 
 // New returns a value for the provided key.
 // In the case no value exists, the initializer is used as the default value.
+// The initializer is the value that will be returned from the map.
+// Take care when casting it.
 //
 //	v := (*T)(m.New("foo", &T{}))
 //
@@ -52,7 +54,7 @@ func (m *Map) New(k string, init unsafe.Pointer) unsafe.Pointer {
 	return m.data[k]
 }
 
-// Next iterates over the collect, returning the data and a boolean to indicate
+// Next iterates over the collection, returning the data and a boolean to indicate
 // the end.
 //
 // 	for v, ok := m.Next(); ok; v, ok = m.Next() {
