@@ -23,6 +23,7 @@ import (
 	"git.sr.ht/~whereswaldon/materials"
 
 	"gioui.org/app"
+	"gioui.org/io/key"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -126,8 +127,6 @@ func (ui *UI) Loop() error {
 			return event.Err
 		case system.ClipboardEvent:
 			fmt.Printf("clipboard: %v\n", event.Text)
-		case *system.CommandEvent:
-			// TODO: integrate with command events.
 		case system.FrameEvent:
 			gtx := layout.NewContext(&ops, event)
 			ui.Update(gtx)
@@ -141,6 +140,14 @@ func (ui *UI) Loop() error {
 // and others are for the devs.
 // Currently errors are just printed; not great for windowed applications.
 func (ui *UI) Update(gtx C) {
+	for _, event := range gtx.Events(ui) {
+		if k, ok := event.(key.Event); ok {
+			if k.Name == key.NameEscape {
+				ui.Modal = nil
+				ui.TicketForm = TicketForm{}
+			}
+		}
+	}
 	for ii := range ui.Panels {
 		panel := &ui.Panels[ii]
 		if panel.CreateTicket.Clicked() {
@@ -249,6 +256,7 @@ func (ui *UI) Update(gtx C) {
 }
 
 func (ui *UI) Layout(gtx C) D {
+	key.InputOp{Tag: ui}.Add(gtx.Ops)
 	return layout.Stack{}.Layout(
 		gtx,
 		layout.Stacked(func(gtx C) D {
