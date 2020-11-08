@@ -400,7 +400,7 @@ func (ui *UI) Refocus(d Direction) {
 				ui.FocusedTicket.Stage = len(stages) - 1
 			}
 		}
-		if len(stages[ui.FocusedTicket.Stage].Tickets) > 0 {
+		if stage := stages[ui.FocusedTicket.Stage]; !stage.Empty() {
 			break
 		}
 	}

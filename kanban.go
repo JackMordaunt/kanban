@@ -19,6 +19,10 @@ type Stage struct {
 	Tickets []Ticket
 }
 
+func (s Stage) Empty() bool {
+	return len(s.Tickets) == 0
+}
+
 // Ticket in a stage.
 type Ticket struct {
 	ID         int
