@@ -60,37 +60,37 @@ func main() {
 		log.Fatalf("error: initializing data: %v", err)
 	}
 	defer db.Close()
-	ui := &UI{
-		Window: app.NewWindow(app.Title("Kanban")),
-		Th:     material.NewTheme(gofont.Collection()),
-		Kanban: &kanban.Kanban{
-			Store: db,
-		},
-		// TODO: render dynamically from storage.
-		Panels: []Panel{
-			{
-				Label:     "Todo",
-				Color:     color.RGBA{R: 0x91, G: 0x81, B: 0x8a, A: 220},
-				Thickness: unit.Dp(50),
-			},
-			{
-				Label:     "In Progress",
-				Color:     color.RGBA{R: 0, G: 100, B: 200, A: 220},
-				Thickness: unit.Dp(50),
-			},
-			{
-				Label:     "Testing",
-				Color:     color.RGBA{R: 200, G: 100, B: 0, A: 220},
-				Thickness: unit.Dp(50),
-			},
-			{
-				Label:     "Done",
-				Color:     color.RGBA{R: 50, G: 200, B: 100, A: 220},
-				Thickness: unit.Dp(50),
-			},
-		},
-	}
 	go func() {
+		ui := UI{
+			Window: app.NewWindow(app.Title("Kanban")),
+			Th:     material.NewTheme(gofont.Collection()),
+			Kanban: &kanban.Kanban{
+				Store: db,
+			},
+			// TODO: render dynamically from storage.
+			Panels: []Panel{
+				{
+					Label:     "Todo",
+					Color:     color.RGBA{R: 0x91, G: 0x81, B: 0x8a, A: 220},
+					Thickness: unit.Dp(50),
+				},
+				{
+					Label:     "In Progress",
+					Color:     color.RGBA{R: 0, G: 100, B: 200, A: 220},
+					Thickness: unit.Dp(50),
+				},
+				{
+					Label:     "Testing",
+					Color:     color.RGBA{R: 200, G: 100, B: 0, A: 220},
+					Thickness: unit.Dp(50),
+				},
+				{
+					Label:     "Done",
+					Color:     color.RGBA{R: 50, G: 200, B: 100, A: 220},
+					Thickness: unit.Dp(50),
+				},
+			},
+		}
 		if err := ui.Loop(); err != nil {
 			log.Fatalf("error: %v", err)
 		}
@@ -153,13 +153,7 @@ func (ui *UI) Update(gtx C) {
 		if k, ok := event.(key.Event); ok {
 			switch k.Name {
 			case key.NameEscape:
-				ui.Modal = nil
-				ui.TicketForm = TicketForm{}
-				ui.FocusedTicket = struct {
-					ID    int
-					Index int
-					Stage int
-				}{}
+				ui.Clear()
 			case key.NameEnter, key.NameReturn:
 				// TODO: query for a single Ticket by ID, quickly.
 				tickets, err := ui.Kanban.Tickets()
@@ -170,14 +164,7 @@ func (ui *UI) Update(gtx C) {
 				for _, t := range tickets {
 					t := t
 					if t.ID == ui.FocusedTicket.ID {
-						ui.TicketDetails.Ticket = t
-						ui.Modal = func(gtx C) D {
-							return Card{
-								Title: fmt.Sprintf("%q", t.Title),
-							}.Layout(gtx, ui.Th, func(gtx C) D {
-								return ui.TicketDetails.Layout(gtx, ui.Th)
-							})
-						}
+						ui.InspectTicket(t)
 						break
 					}
 				}
@@ -186,9 +173,9 @@ func (ui *UI) Update(gtx C) {
 			case key.NameUpArrow:
 				ui.Refocus(PreviousTicket)
 			case key.NameRightArrow:
-				ui.Refocus(PreviousStage)
-			case key.NameLeftArrow:
 				ui.Refocus(NextStage)
+			case key.NameLeftArrow:
+				ui.Refocus(PreviousStage)
 			}
 		}
 	}
@@ -220,34 +207,13 @@ func (ui *UI) Update(gtx C) {
 			}
 		}
 		if t.EditButton.Clicked() {
-			ui.TicketForm.Set(t.Ticket)
-			ui.Modal = func(gtx C) D {
-				return Card{
-					Title: "Edit Ticket",
-				}.Layout(gtx, ui.Th, func(gtx C) D {
-					return ui.TicketForm.Layout(gtx, ui.Th, "")
-				})
-			}
+			ui.EditTicket(t.Ticket)
 		}
 		if t.DeleteButton.Clicked() {
-			ui.DeleteDialog.Ticket = t.Ticket
-			ui.Modal = func(gtx C) D {
-				return Card{
-					Title: "Delete Ticket",
-				}.Layout(gtx, ui.Th, func(gtx C) D {
-					return ui.DeleteDialog.Layout(gtx, ui.Th)
-				})
-			}
+			ui.DeleteTicket(t.Ticket)
 		}
 		if t.Content.Clicked() {
-			ui.TicketDetails.Ticket = t.Ticket
-			ui.Modal = func(gtx C) D {
-				return Card{
-					Title: fmt.Sprintf("%q", t.Title),
-				}.Layout(gtx, ui.Th, func(gtx C) D {
-					return ui.TicketDetails.Layout(gtx, ui.Th)
-				})
-			}
+			ui.InspectTicket(t.Ticket)
 		}
 	}
 	if ui.TicketForm.Submit.Clicked() {
@@ -267,35 +233,25 @@ func (ui *UI) Update(gtx C) {
 				return
 			}
 		}
-		ui.TicketForm = TicketForm{}
-		ui.Modal = nil
+		ui.Clear()
 	}
 	if ui.TicketForm.Cancel.Clicked() {
-		ui.TicketForm = TicketForm{}
-		ui.Modal = nil
+		ui.Clear()
 	}
 	if ui.DeleteDialog.Ok.Clicked() {
 		if err := ui.Kanban.Delete(ui.DeleteDialog.ID); err != nil {
 			fmt.Printf("error: %s\n", err)
 		}
-		ui.Modal = nil
+		ui.Clear()
 	}
 	if ui.DeleteDialog.Cancel.Clicked() {
-		ui.Modal = nil
+		ui.Clear()
 	}
 	if ui.TicketDetails.Edit.Clicked() {
-		ui.TicketForm.Set(ui.TicketDetails.Ticket)
-		ui.Modal = func(gtx C) D {
-			return Card{
-				Title: "Edit Ticket",
-			}.Layout(gtx, ui.Th, func(gtx C) D {
-				return ui.TicketForm.Layout(gtx, ui.Th, "")
-			})
-		}
+		ui.EditTicket(ui.TicketDetails.Ticket)
 	}
 	if ui.TicketDetails.Cancel.Clicked() {
-		ui.TicketForm = TicketForm{}
-		ui.Modal = nil
+		ui.Clear()
 	}
 }
 
@@ -387,13 +343,13 @@ func (ui *UI) Refocus(d Direction) {
 				}
 				ui.FocusedTicket.Index = len(stages[ui.FocusedTicket.Stage].Tickets)
 			}
-		case PreviousStage:
+		case NextStage:
 			ui.FocusedTicket.Index = 1
 			ui.FocusedTicket.Stage++
 			if ui.FocusedTicket.Stage > len(stages)-1 {
 				ui.FocusedTicket.Stage = 0
 			}
-		case NextStage:
+		case PreviousStage:
 			ui.FocusedTicket.Index = 1
 			ui.FocusedTicket.Stage--
 			if ui.FocusedTicket.Stage < 0 {
@@ -405,6 +361,53 @@ func (ui *UI) Refocus(d Direction) {
 		}
 	}
 	ui.FocusedTicket.ID = stages[ui.FocusedTicket.Stage].Tickets[ui.FocusedTicket.Index-1].ID
+}
+
+// Clear resets navigational state.
+func (ui *UI) Clear() {
+	ui.Modal = nil
+	ui.TicketForm = TicketForm{}
+	ui.FocusedTicket = struct {
+		ID    int
+		Index int
+		Stage int
+	}{}
+}
+
+// InspectTicket opens the ticket details card for the given ticket.
+func (ui *UI) InspectTicket(t kanban.Ticket) {
+	ui.TicketDetails.Ticket = t
+	ui.Modal = func(gtx C) D {
+		return Card{
+			Title: fmt.Sprintf("%q", t.Title),
+		}.Layout(gtx, ui.Th, func(gtx C) D {
+			return ui.TicketDetails.Layout(gtx, ui.Th)
+		})
+	}
+}
+
+// EditTicket opens the ticket form for editing ticket data.
+func (ui *UI) EditTicket(t kanban.Ticket) {
+	ui.TicketForm.Set(t)
+	ui.Modal = func(gtx C) D {
+		return Card{
+			Title: "Edit Ticket",
+		}.Layout(gtx, ui.Th, func(gtx C) D {
+			return ui.TicketForm.Layout(gtx, ui.Th, "")
+		})
+	}
+}
+
+// DeleteTickets opens the confirmation dialog for deleting a ticket.
+func (ui *UI) DeleteTicket(t kanban.Ticket) {
+	ui.DeleteDialog.Ticket = t
+	ui.Modal = func(gtx C) D {
+		return Card{
+			Title: "Delete Ticket",
+		}.Layout(gtx, ui.Th, func(gtx C) D {
+			return ui.DeleteDialog.Layout(gtx, ui.Th)
+		})
+	}
 }
 
 // TicketForm renders the form for ticket information.
