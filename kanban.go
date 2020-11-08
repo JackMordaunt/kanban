@@ -30,6 +30,20 @@ type Ticket struct {
 	Created    time.Time
 }
 
+func (k Kanban) Tickets() ([]Ticket, error) {
+	stages, err := k.ListStages()
+	if err != nil {
+		return nil, err
+	}
+	var tickets []Ticket
+	for _, stage := range stages {
+		for _, t := range stage.Tickets {
+			tickets = append(tickets, t)
+		}
+	}
+	return tickets, nil
+}
+
 // ListStages returns a list of stages.
 func (k Kanban) ListStages() ([]Stage, error) {
 	var stages []Stage

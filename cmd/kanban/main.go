@@ -117,12 +117,20 @@ type UI struct {
 	TicketForm    TicketForm
 	TicketDetails TicketDetails
 	DeleteDialog  DeleteDialog
+	FocusedTicket struct {
+		ID    int
+		Index int
+		Stage int
+	}
 }
 
 func (ui *UI) Loop() error {
-	var ops op.Ops
-	for {
-		switch event := (<-ui.Events()).(type) {
+	var (
+		ops    op.Ops
+		events = ui.Events()
+	)
+	for event := range events {
+		switch event := (event).(type) {
 		case system.DestroyEvent:
 			return event.Err
 		case system.ClipboardEvent:
@@ -134,6 +142,7 @@ func (ui *UI) Loop() error {
 			event.Frame(gtx.Ops)
 		}
 	}
+	return nil
 }
 
 // TODO: investigate best way to handle errors. Some errors are for the user
@@ -142,9 +151,44 @@ func (ui *UI) Loop() error {
 func (ui *UI) Update(gtx C) {
 	for _, event := range gtx.Events(ui) {
 		if k, ok := event.(key.Event); ok {
-			if k.Name == key.NameEscape {
+			switch k.Name {
+			case key.NameEscape:
 				ui.Modal = nil
 				ui.TicketForm = TicketForm{}
+				ui.FocusedTicket = struct {
+					ID    int
+					Index int
+					Stage int
+				}{}
+			case key.NameEnter, key.NameReturn:
+				// TODO: query for a single Ticket by ID, quickly.
+				tickets, err := ui.Kanban.Tickets()
+				if err != nil {
+					fmt.Printf("error: %v", err)
+					break
+				}
+				for _, t := range tickets {
+					t := t
+					if t.ID == ui.FocusedTicket.ID {
+						ui.TicketDetails.Ticket = t
+						ui.Modal = func(gtx C) D {
+							return Card{
+								Title: fmt.Sprintf("%q", t.Title),
+							}.Layout(gtx, ui.Th, func(gtx C) D {
+								return ui.TicketDetails.Layout(gtx, ui.Th)
+							})
+						}
+						break
+					}
+				}
+			case key.NameDownArrow:
+				ui.Refocus(NextTicket)
+			case key.NameUpArrow:
+				ui.Refocus(PreviousTicket)
+			case key.NameRightArrow:
+				ui.Refocus(PreviousStage)
+			case key.NameLeftArrow:
+				ui.Refocus(NextStage)
 			}
 		}
 	}
@@ -273,6 +317,14 @@ func (ui *UI) Layout(gtx C) D {
 							t := (*Ticket)(ui.TicketStates.New(id, unsafe.Pointer(&Ticket{})))
 							t.Ticket = stage.Tickets[ii]
 							t.Stage = stage.Name
+							if ui.FocusedTicket.ID == t.ID {
+								return widget.Border{
+									Color: color.RGBA{B: 200, A: 200},
+									Width: unit.Dp(2),
+								}.Layout(gtx, func(gtx C) D {
+									return t.Layout(gtx, ui.Th)
+								})
+							}
 							return t.Layout(gtx, ui.Th)
 						}
 					}
@@ -296,6 +348,58 @@ func (ui *UI) Layout(gtx C) D {
 			})
 		}),
 	)
+}
+
+type Direction uint8
+
+const (
+	NextTicket Direction = iota
+	PreviousTicket
+	NextStage
+	PreviousStage
+)
+
+// Refocus to the ticket in the given direction.
+// Allows movement between tickets and stages in sequential order.
+func (ui *UI) Refocus(d Direction) {
+	stages, err := ui.Kanban.ListStages()
+	if err != nil {
+		fmt.Printf("error: querying stages: %v", err)
+		return
+	}
+	switch d {
+	case NextTicket:
+		ui.FocusedTicket.Index++
+		if ui.FocusedTicket.Index > len(stages[ui.FocusedTicket.Stage].Tickets) {
+			ui.FocusedTicket.Index = 1
+			ui.FocusedTicket.Stage++
+			if ui.FocusedTicket.Stage > len(stages)-1 {
+				ui.FocusedTicket.Stage = 0
+			}
+		}
+	case PreviousTicket:
+		ui.FocusedTicket.Index--
+		if ui.FocusedTicket.Index < 1 {
+			ui.FocusedTicket.Stage--
+			if ui.FocusedTicket.Stage < 0 {
+				ui.FocusedTicket.Stage = len(stages) - 1
+			}
+			ui.FocusedTicket.Index = len(stages[ui.FocusedTicket.Stage].Tickets)
+		}
+	case PreviousStage:
+		ui.FocusedTicket.Index = 1
+		ui.FocusedTicket.Stage++
+		if ui.FocusedTicket.Stage > len(stages)-1 {
+			ui.FocusedTicket.Stage = 0
+		}
+	case NextStage:
+		ui.FocusedTicket.Index = 1
+		ui.FocusedTicket.Stage--
+		if ui.FocusedTicket.Stage < 0 {
+			ui.FocusedTicket.Stage = len(stages) - 1
+		}
+	}
+	ui.FocusedTicket.ID = stages[ui.FocusedTicket.Stage].Tickets[ui.FocusedTicket.Index-1].ID
 }
 
 // TicketForm renders the form for ticket information.
