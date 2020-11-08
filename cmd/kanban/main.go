@@ -367,36 +367,41 @@ func (ui *UI) Refocus(d Direction) {
 		fmt.Printf("error: querying stages: %v", err)
 		return
 	}
-	switch d {
-	case NextTicket:
-		ui.FocusedTicket.Index++
-		if ui.FocusedTicket.Index > len(stages[ui.FocusedTicket.Stage].Tickets) {
+	for {
+		switch d {
+		case NextTicket:
+			ui.FocusedTicket.Index++
+			if ui.FocusedTicket.Index > len(stages[ui.FocusedTicket.Stage].Tickets) {
+				ui.FocusedTicket.Index = 1
+				ui.FocusedTicket.Stage++
+				if ui.FocusedTicket.Stage > len(stages)-1 {
+					ui.FocusedTicket.Stage = 0
+				}
+			}
+		case PreviousTicket:
+			ui.FocusedTicket.Index--
+			if ui.FocusedTicket.Index < 1 {
+				ui.FocusedTicket.Stage--
+				if ui.FocusedTicket.Stage < 0 {
+					ui.FocusedTicket.Stage = len(stages) - 1
+				}
+				ui.FocusedTicket.Index = len(stages[ui.FocusedTicket.Stage].Tickets)
+			}
+		case PreviousStage:
 			ui.FocusedTicket.Index = 1
 			ui.FocusedTicket.Stage++
 			if ui.FocusedTicket.Stage > len(stages)-1 {
 				ui.FocusedTicket.Stage = 0
 			}
-		}
-	case PreviousTicket:
-		ui.FocusedTicket.Index--
-		if ui.FocusedTicket.Index < 1 {
+		case NextStage:
+			ui.FocusedTicket.Index = 1
 			ui.FocusedTicket.Stage--
 			if ui.FocusedTicket.Stage < 0 {
 				ui.FocusedTicket.Stage = len(stages) - 1
 			}
-			ui.FocusedTicket.Index = len(stages[ui.FocusedTicket.Stage].Tickets)
 		}
-	case PreviousStage:
-		ui.FocusedTicket.Index = 1
-		ui.FocusedTicket.Stage++
-		if ui.FocusedTicket.Stage > len(stages)-1 {
-			ui.FocusedTicket.Stage = 0
-		}
-	case NextStage:
-		ui.FocusedTicket.Index = 1
-		ui.FocusedTicket.Stage--
-		if ui.FocusedTicket.Stage < 0 {
-			ui.FocusedTicket.Stage = len(stages) - 1
+		if len(stages[ui.FocusedTicket.Stage].Tickets) > 0 {
+			break
 		}
 	}
 	ui.FocusedTicket.ID = stages[ui.FocusedTicket.Stage].Tickets[ui.FocusedTicket.Index-1].ID
