@@ -24,8 +24,17 @@ type Rect struct {
 
 // Layout renders the Rect into the provided context
 func (r Rect) Layout(gtx C) D {
-	paint.FillShape(gtx.Ops, clip.UniformRRect(f32.Rectangle{Max: r.Size}, r.Radii).Op(gtx.Ops), r.Color)
-	return layout.Dimensions{Size: image.Pt(int(r.Size.X), int(r.Size.Y))}
+	paint.FillShape(
+		gtx.Ops,
+		r.Color,
+		clip.UniformRRect(
+			f32.Rectangle{Max: r.Size},
+			r.Radii,
+		).Op(gtx.Ops),
+	)
+	return layout.Dimensions{
+		Size: image.Pt(int(r.Size.X), int(r.Size.Y)),
+	}
 }
 
 // Button renders a clickable button.
@@ -83,11 +92,11 @@ func WithIcon(icon *widget.Icon) ButtonOption {
 	}
 }
 
-func WithText(txt string) ButtonOption {
-	return func(btn *ButtonStyle) {
-		btn.Text = txt
-	}
-}
+// func WithText(txt string) ButtonOption {
+// 	return func(btn *ButtonStyle) {
+// 		btn.Text = txt
+// 	}
+// }
 
 func WithInset(inset layout.Inset) ButtonOption {
 	return func(btn *ButtonStyle) {
