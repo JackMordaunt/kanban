@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/jackmordaunt/icns"
 )
@@ -25,8 +26,15 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("building: %w", err)
 		}
-		if err := bundle("dist/Kanban.app", binary, "res/icon.png", "res/darwin/Info.plist"); err != nil {
-			return fmt.Errorf("bundling: %w", err)
+		if runtime.GOOS == "darwin" {
+			if err := bundleDarwin("dist/Kanban.app", binary, "res/icon.png", "res/darwin/Info.plist"); err != nil {
+				return fmt.Errorf("bundling: %w", err)
+			}
+		}
+		if runtime.GOOS == "windows" {
+			if err := bundleWindows("dist/Kanban.exe", binary, "res/icon.png", "res/darwin/Info.plist"); err != nil {
+				return fmt.Errorf("bundling: %w", err)
+			}
 		}
 		return nil
 	}(); err != nil {
@@ -34,10 +42,10 @@ func main() {
 	}
 }
 
-// bundle creates a macOS .app bundle on disk rooted at dest.
+// bundleDarwin creates a macOS .app bundleDarwin on disk rooted at dest.
 // All paramaters are filepaths.
 // NB: Will clobber destination if it is a directory, or error if it is a file.
-func bundle(dest, binary, icon, plist string) error {
+func bundleDarwin(dest, binary, icon, plist string) error {
 	var (
 		contents  = filepath.Join(dest, "Contents")
 		macos     = filepath.Join(contents, "MacOS")
@@ -52,8 +60,12 @@ func bundle(dest, binary, icon, plist string) error {
 	} else if !m.IsDir() {
 		return fmt.Errorf("destination %q: not a directory", dest)
 	}
-	os.MkdirAll(macos, 0777)
-	os.MkdirAll(resources, 0777)
+	if err := os.MkdirAll(macos, 0777); err != nil {
+		return fmt.Errorf("preparing directory: %w", err)
+	}
+	if err := os.MkdirAll(resources, 0777); err != nil {
+		return fmt.Errorf("preparing directory: %w", err)
+	}
 	if err := cp(binary, filepath.Join(macos, "kanban")); err != nil {
 		return fmt.Errorf("copying binary: %w", err)
 	}
@@ -63,6 +75,10 @@ func bundle(dest, binary, icon, plist string) error {
 	if err := convertIcon(icon, filepath.Join(resources, "kanban.icns")); err != nil {
 		return fmt.Errorf("converting icon to icns: %w", err)
 	}
+	return nil
+}
+
+func bundleWindows(dest, binary, icon, manifest string) error {
 	return nil
 }
 
@@ -132,7 +148,9 @@ func cp(src, dst string) error {
 	defer srcf.Close()
 	_, err = os.Stat(filepath.Dir(dst))
 	if os.IsNotExist(err) {
-		os.MkdirAll(filepath.Dir(dst), 0777)
+		if err := os.MkdirAll(filepath.Dir(dst), 0777); err != nil {
+			return fmt.Errorf("preparing %q: %w", filepath.Dir(dst), err)
+		}
 	}
 	dstf, err := os.OpenFile(dst, os.O_CREATE|os.O_RDWR, 0777)
 	if err != nil {
