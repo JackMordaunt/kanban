@@ -127,7 +127,7 @@ type UI struct {
 func (ui *UI) Loop() error {
 	var (
 		ops    op.Ops
-		events = ui.Events()
+		events = ui.Window.Events()
 	)
 	for event := range events {
 		switch event := (event).(type) {
@@ -869,6 +869,12 @@ func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
 		Axis: layout.Vertical,
 	}.Layout(
 		gtx,
+		layout.Rigid(func(gtx C) D {
+			return material.Body2(th, t.Category).Layout(gtx)
+		}),
+		layout.Rigid(func(gtx C) D {
+			return material.Body1(th, t.Summary).Layout(gtx)
+		}),
 		layout.Rigid(func(gtx C) D {
 			return material.Body1(th, t.Details).Layout(gtx)
 		}),
