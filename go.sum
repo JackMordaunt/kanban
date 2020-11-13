@@ -2,8 +2,12 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 gioui.org v0.0.0-20201106195654-dbc0796d0207/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
 gioui.org v0.0.0-20201110154114-ae256b5be812 h1:fmETJJuKWcrg5pYKSX/MkwNXv3MBF7LsjBPa4qyO1Cw=
 gioui.org v0.0.0-20201110154114-ae256b5be812/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
+gioui.org v0.0.0-20201112145235-3c739323cb4f h1:O1WtE27z2GqOJjE0Dl6k2qqts63tqoSwwoWyE7K3RLM=
+gioui.org v0.0.0-20201112145235-3c739323cb4f/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
 git.sr.ht/~whereswaldon/materials v0.0.0-20201108152851-4af89701ceb6 h1:R/9jzikSdVeHbeJx5WU3e4lNRHzxLt2HduMWLa78m5k=
 git.sr.ht/~whereswaldon/materials v0.0.0-20201108152851-4af89701ceb6/go.mod h1:TayKd2ixEIPSq7ZzJIb1hcIsV1FapB43GCSx8GnLyUg=
+git.sr.ht/~whereswaldon/materials v0.0.0-20201111125311-690e8da25ce3 h1:885LotAnlGb2X4ZBmaqbkmVpW+KkQJEALwmHcm4WHo8=
+git.sr.ht/~whereswaldon/materials v0.0.0-20201111125311-690e8da25ce3/go.mod h1:C1KEwj50dyQ+TpIaomIgBqhnSbbB34UqeFvuCOuddro=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DataDog/zstd v1.4.1 h1:3oxKN3wbHibqx897utPC2LTQU4J+IHWWJO+glkAkpFM=
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
@@ -75,6 +79,8 @@ golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5 h1:LfCXLvNmTYH9kEmVgqbnsWfru
 golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20201110211018-35f3e6cf4a65 h1:Qo9oJ566/Sq7N4hrGftVXs8GI2CXBCuOd4S2wHE/e0M=
 golang.org/x/sys v0.0.0-20201110211018-35f3e6cf4a65/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20201112073958-5cba982894dd h1:5CtCZbICpIOFdgO940moixOPjc0178IU44m4EjOO5IY=
+golang.org/x/sys v0.0.0-20201112073958-5cba982894dd/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=

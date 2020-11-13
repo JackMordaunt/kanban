@@ -112,6 +112,7 @@ type UI struct {
 	Kanban        *kanban.Kanban
 	Th            *material.Theme
 	Panels        []Panel
+	Rail          Rail
 	TicketStates  Map
 	Modal         layout.Widget
 	TicketForm    TicketForm
@@ -122,6 +123,8 @@ type UI struct {
 		Index int
 		Stage int
 	}
+	CreateProjectButton widget.Clickable
+	ProjectForm         ProjectForm
 }
 
 func (ui *UI) Loop() error {
@@ -182,13 +185,7 @@ func (ui *UI) Update(gtx C) {
 	for ii := range ui.Panels {
 		panel := &ui.Panels[ii]
 		if panel.CreateTicket.Clicked() {
-			ui.Modal = func(gtx C) D {
-				return Card{
-					Title: "Add Ticket",
-				}.Layout(gtx, ui.Th, func(gtx C) D {
-					return ui.TicketForm.Layout(gtx, ui.Th, panel.Label)
-				})
-			}
+			ui.AddTicket(panel.Label)
 		}
 	}
 	for s, ok := ui.TicketStates.Next(); ok; s, ok = ui.TicketStates.Next() {
@@ -253,55 +250,94 @@ func (ui *UI) Update(gtx C) {
 	if ui.TicketDetails.Cancel.Clicked() {
 		ui.Clear()
 	}
+	if ui.CreateProjectButton.Clicked() {
+		ui.CreateProject()
+	}
+	if ui.ProjectForm.Cancel.Clicked() {
+		ui.Clear()
+	}
 }
 
 func (ui *UI) Layout(gtx C) D {
 	key.InputOp{Tag: ui}.Add(gtx.Ops)
-	return layout.Stack{}.Layout(
+	return layout.Flex{Axis: layout.Horizontal}.Layout(
 		gtx,
-		layout.Stacked(func(gtx C) D {
-			ui.TicketStates.Begin()
-			var panels = make([]layout.FlexChild, len(ui.Panels))
-			for kk := range ui.Panels {
-				panel := &ui.Panels[kk]
-				panels[kk] = layout.Flexed(1, func(gtx C) D {
-					stage, _ := ui.Kanban.Stage(panel.Label)
-					var cards = make([]layout.ListElement, len(stage.Tickets))
-					for ii, ticket := range stage.Tickets {
-						id := strconv.Itoa(ticket.ID)
-						cards[ii] = func(gtx C, ii int) D {
-							t := (*Ticket)(ui.TicketStates.New(id, unsafe.Pointer(&Ticket{})))
-							t.Ticket = stage.Tickets[ii]
-							t.Stage = stage.Name
-							if ui.FocusedTicket.ID == t.ID {
-								return widget.Border{
-									Color: color.RGBA{B: 200, A: 200},
-									Width: unit.Dp(2),
-								}.Layout(gtx, func(gtx C) D {
-									return t.Layout(gtx, ui.Th)
-								})
-							}
-							return t.Layout(gtx, ui.Th)
-						}
-					}
-					return panel.Layout(gtx, ui.Th, cards...)
-				})
-			}
-			return layout.Flex{
-				Axis:    layout.Horizontal,
-				Spacing: layout.SpaceEvenly,
-			}.Layout(
+		layout.Rigid(func(gtx C) D {
+			gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
+			gtx.Constraints.Max.X = gtx.Px(unit.Dp(80))
+			gtx.Constraints.Min.X = 0
+			return ui.Rail.Layout(
 				gtx,
-				panels...,
+				func(gtx C) D {
+					return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
+						btn := material.IconButton(ui.Th, &ui.CreateProjectButton, icons.ContentAdd)
+						btn.Size = unit.Dp(20)
+						btn.Inset = layout.UniformInset(unit.Dp(8))
+						return btn.Layout(gtx)
+					})
+				},
+				Destination("kanban", func(gtx C) D {
+					return material.Label(ui.Th, unit.Dp(16), "Kanban").Layout(gtx)
+				}),
+				Destination("avisha", func(gtx C) D {
+					return material.Label(ui.Th, unit.Dp(16), "Avisha").Layout(gtx)
+				}),
+				Destination("watch", func(gtx C) D {
+					return material.Label(ui.Th, unit.Dp(16), "Watch").Layout(gtx)
+				}),
+				Destination("gopack", func(gtx C) D {
+					return material.Label(ui.Th, unit.Dp(16), "GoPack").Layout(gtx)
+				}),
 			)
 		}),
-		layout.Expanded(func(gtx C) D {
-			if ui.Modal == nil {
-				return D{}
-			}
-			return Modal(gtx, func(gtx C) D {
-				return ui.Modal(gtx)
-			})
+		layout.Flexed(1, func(gtx C) D {
+			return layout.Stack{}.Layout(
+				gtx,
+				layout.Stacked(func(gtx C) D {
+					ui.TicketStates.Begin()
+					var panels = make([]layout.FlexChild, len(ui.Panels))
+					for kk := range ui.Panels {
+						panel := &ui.Panels[kk]
+						panels[kk] = layout.Flexed(1, func(gtx C) D {
+							stage, _ := ui.Kanban.Stage(panel.Label)
+							var cards = make([]layout.ListElement, len(stage.Tickets))
+							for ii, ticket := range stage.Tickets {
+								id := strconv.Itoa(ticket.ID)
+								cards[ii] = func(gtx C, ii int) D {
+									t := (*Ticket)(ui.TicketStates.New(id, unsafe.Pointer(&Ticket{})))
+									t.Ticket = stage.Tickets[ii]
+									t.Stage = stage.Name
+									if ui.FocusedTicket.ID == t.ID {
+										return widget.Border{
+											Color: color.RGBA{B: 200, A: 200},
+											Width: unit.Dp(2),
+										}.Layout(gtx, func(gtx C) D {
+											return t.Layout(gtx, ui.Th)
+										})
+									}
+									return t.Layout(gtx, ui.Th)
+								}
+							}
+							return panel.Layout(gtx, ui.Th, cards...)
+						})
+					}
+					return layout.Flex{
+						Axis:    layout.Horizontal,
+						Spacing: layout.SpaceEvenly,
+					}.Layout(
+						gtx,
+						panels...,
+					)
+				}),
+				layout.Expanded(func(gtx C) D {
+					if ui.Modal == nil {
+						return D{}
+					}
+					return Modal(gtx, func(gtx C) D {
+						return ui.Modal(gtx)
+					})
+				}),
+			)
 		}),
 	)
 }
@@ -367,6 +403,7 @@ func (ui *UI) Refocus(d Direction) {
 func (ui *UI) Clear() {
 	ui.Modal = nil
 	ui.TicketForm = TicketForm{}
+	ui.ProjectForm = ProjectForm{}
 	ui.FocusedTicket = struct {
 		ID    int
 		Index int
@@ -394,6 +431,28 @@ func (ui *UI) EditTicket(t kanban.Ticket) {
 			Title: "Edit Ticket",
 		}.Layout(gtx, ui.Th, func(gtx C) D {
 			return ui.TicketForm.Layout(gtx, ui.Th, "")
+		})
+	}
+}
+
+// AddTicket opens the ticket form for creating ticket data.
+func (ui *UI) AddTicket(stage string) {
+	ui.Modal = func(gtx C) D {
+		return Card{
+			Title: "Add Ticket",
+		}.Layout(gtx, ui.Th, func(gtx C) D {
+			return ui.TicketForm.Layout(gtx, ui.Th, stage)
+		})
+	}
+}
+
+// CreatTicket opens the project creation dialog.
+func (ui *UI) CreateProject() {
+	ui.Modal = func(gtx C) D {
+		return Card{
+			Title: "Create a new Project",
+		}.Layout(gtx, ui.Th, func(gtx C) D {
+			return ui.ProjectForm.Layout(gtx, ui.Th)
 		})
 	}
 }
@@ -901,6 +960,51 @@ func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						return material.Button(th, &t.Edit, "Edit").Layout(gtx)
+					}),
+				)
+			})
+		}),
+	)
+}
+
+// ProjectForm renders a form for manipulating projects.
+type ProjectForm struct {
+	Name   materials.TextField
+	Submit widget.Clickable
+	Cancel widget.Clickable
+}
+
+func (form *ProjectForm) Layout(gtx C, th *material.Theme) D {
+	return layout.Flex{
+		Axis: layout.Vertical,
+	}.Layout(
+		gtx,
+		layout.Rigid(func(gtx C) D {
+			return form.Name.Layout(gtx, th, "Project Name")
+		}),
+		layout.Rigid(func(gtx C) D {
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
+			return layout.Inset{
+				Top: unit.Dp(10),
+			}.Layout(gtx, func(gtx C) D {
+				return layout.Flex{
+					Axis: layout.Horizontal,
+				}.Layout(
+					gtx,
+					layout.Flexed(1, func(gtx C) D {
+						return D{Size: gtx.Constraints.Min}
+					}),
+					layout.Rigid(func(gtx C) D {
+						btn := material.Button(th, &form.Cancel, "Cancel")
+						btn.Color = th.Color.Primary
+						btn.Background = color.RGBA{}
+						return btn.Layout(gtx)
+					}),
+					layout.Rigid(func(gtx C) D {
+						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
+					}),
+					layout.Rigid(func(gtx C) D {
+						return material.Button(th, &form.Submit, "Submit").Layout(gtx)
 					}),
 				)
 			})
