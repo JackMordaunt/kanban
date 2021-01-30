@@ -19,7 +19,7 @@ func (c Card) Layout(gtx C, th *material.Theme, w layout.Widget) D {
 		gtx,
 		layout.Expanded(func(gtx C) D {
 			return Rect{
-				Color: color.RGBA{R: 255, G: 255, B: 255, A: 255},
+				Color: color.NRGBA{R: 255, G: 255, B: 255, A: 255},
 				Size:  layout.FPt(gtx.Constraints.Min),
 				Radii: 4,
 			}.Layout(gtx)
@@ -35,7 +35,7 @@ func (c Card) Layout(gtx C, th *material.Theme, w layout.Widget) D {
 						gtx,
 						layout.Expanded(func(gtx C) D {
 							return Rect{
-								Color: color.RGBA{A: 100},
+								Color: color.NRGBA{A: 100},
 								Size: f32.Point{
 									X: float32(gtx.Constraints.Max.X),
 									Y: float32(gtx.Constraints.Min.Y),
@@ -66,7 +66,7 @@ func Modal(gtx C, w layout.Widget) D {
 		layout.Stacked(func(gtx C) D {
 			return Rect{
 				Size:  layout.FPt(gtx.Constraints.Max),
-				Color: color.RGBA{A: 200},
+				Color: color.NRGBA{A: 200},
 			}.Layout(gtx)
 		}),
 		layout.Stacked(func(gtx C) D {

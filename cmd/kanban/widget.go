@@ -18,7 +18,7 @@ import (
 // Dimensions specified by size and a corner radius (on all corners)
 // specified by radii.
 type Rect struct {
-	Color color.RGBA
+	Color color.NRGBA
 	Size  f32.Point
 	Radii float32
 }
@@ -73,14 +73,14 @@ func WithSize(sz unit.Value) ButtonOption {
 	}
 }
 
-func WithIconColor(c color.RGBA) ButtonOption {
+func WithIconColor(c color.NRGBA) ButtonOption {
 	return func(btn *ButtonStyle) {
 		btn.IconButtonStyle.Color = c
 		btn.ButtonStyle.Color = c
 	}
 }
 
-func WithBgColor(c color.RGBA) ButtonOption {
+func WithBgColor(c color.NRGBA) ButtonOption {
 	return func(btn *ButtonStyle) {
 		btn.IconButtonStyle.Background = c
 		btn.ButtonStyle.Background = c
@@ -152,7 +152,7 @@ func (r *Rail) Layout(gtx C, action layout.Widget, items ...RailChild) D {
 		layout.Rigid(func(gtx C) D {
 			return layout.UniformInset(unit.Dp(5)).Layout(gtx, func(gtx C) D {
 				return Div{
-					Color:     color.RGBA{R: 220, B: 220, G: 220, A: 255},
+					Color:     color.NRGBA{R: 220, B: 220, G: 220, A: 255},
 					Length:    unit.Px(float32(gtx.Constraints.Max.X)),
 					Thickness: unit.Dp(1),
 					Axis:      layout.Horizontal,
@@ -178,7 +178,7 @@ type Div struct {
 	Thickness unit.Value
 	Length    unit.Value
 	Axis      layout.Axis
-	Color     color.RGBA
+	Color     color.NRGBA
 }
 
 func (d Div) Layout(gtx C) D {

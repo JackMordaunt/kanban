@@ -20,13 +20,13 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"git.sr.ht/~jackmordaunt/kanban/icons"
-	"git.sr.ht/~whereswaldon/materials"
 
 	"gioui.org/app"
 	"gioui.org/io/key"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/x/component"
 )
 
 func main() {
@@ -71,22 +71,22 @@ func main() {
 			Panels: []Panel{
 				{
 					Label:     "Todo",
-					Color:     color.RGBA{R: 0x91, G: 0x81, B: 0x8a, A: 220},
+					Color:     color.NRGBA{R: 0x91, G: 0x81, B: 0x8a, A: 220},
 					Thickness: unit.Dp(50),
 				},
 				{
 					Label:     "In Progress",
-					Color:     color.RGBA{R: 0, G: 100, B: 200, A: 220},
+					Color:     color.NRGBA{R: 0, G: 100, B: 200, A: 220},
 					Thickness: unit.Dp(50),
 				},
 				{
 					Label:     "Testing",
-					Color:     color.RGBA{R: 200, G: 100, B: 0, A: 220},
+					Color:     color.NRGBA{R: 200, G: 100, B: 0, A: 220},
 					Thickness: unit.Dp(50),
 				},
 				{
 					Label:     "Done",
-					Color:     color.RGBA{R: 50, G: 200, B: 100, A: 220},
+					Color:     color.NRGBA{R: 50, G: 200, B: 100, A: 220},
 					Thickness: unit.Dp(50),
 				},
 			},
@@ -136,8 +136,6 @@ func (ui *UI) Loop() error {
 		switch event := (event).(type) {
 		case system.DestroyEvent:
 			return event.Err
-		case system.ClipboardEvent:
-			fmt.Printf("clipboard: %v\n", event.Text)
 		case system.FrameEvent:
 			gtx := layout.NewContext(&ops, event)
 			ui.Update(gtx)
@@ -263,6 +261,8 @@ func (ui *UI) Layout(gtx C) D {
 	return layout.Flex{Axis: layout.Horizontal}.Layout(
 		gtx,
 		layout.Rigid(func(gtx C) D {
+			// TODO: render "active" destination in rail.
+			// TODO: model project with data primitive.
 			gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
 			gtx.Constraints.Max.X = gtx.Px(unit.Dp(80))
 			gtx.Constraints.Min.X = 0
@@ -309,7 +309,7 @@ func (ui *UI) Layout(gtx C) D {
 									t.Stage = stage.Name
 									if ui.FocusedTicket.ID == t.ID {
 										return widget.Border{
-											Color: color.RGBA{B: 200, A: 200},
+											Color: color.NRGBA{B: 200, A: 200},
 											Width: unit.Dp(2),
 										}.Layout(gtx, func(gtx C) D {
 											return t.Layout(gtx, ui.Th)
@@ -475,10 +475,10 @@ func (ui *UI) DeleteTicket(t kanban.Ticket) {
 type TicketForm struct {
 	Stage    string
 	Data     kanban.Ticket
-	Title    materials.TextField
-	Category materials.TextField
-	Summary  materials.TextField
-	Details  materials.TextField
+	Title    component.TextField
+	Category component.TextField
+	Summary  component.TextField
+	Details  component.TextField
 	Submit   widget.Clickable
 	Cancel   widget.Clickable
 }
@@ -538,8 +538,8 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						btn := material.Button(th, &form.Cancel, "Cancel")
-						btn.Color = th.Color.Primary
-						btn.Background = color.RGBA{}
+						btn.Color = th.Bg
+						btn.Background = color.NRGBA{}
 						return btn.Layout(gtx)
 					}),
 					layout.Rigid(func(gtx C) D {
@@ -589,8 +589,8 @@ func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						btn := material.Button(th, &d.Cancel, "Cancel")
-						btn.Color = th.Color.Primary
-						btn.Background = color.RGBA{}
+						btn.Color = th.Bg
+						btn.Background = color.NRGBA{}
 						return btn.Layout(gtx)
 					}),
 					layout.Rigid(func(gtx C) D {
@@ -598,7 +598,7 @@ func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						btn := material.Button(th, &d.Ok, "Delete")
-						btn.Background = color.RGBA{R: 200, A: 255}
+						btn.Background = color.NRGBA{R: 200, A: 255}
 						return btn.Layout(gtx)
 					}),
 				)
@@ -612,7 +612,7 @@ func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
 // Has a title and action bar.
 type Panel struct {
 	Label        string
-	Color        color.RGBA
+	Color        color.NRGBA
 	Thickness    unit.Value
 	CreateTicket widget.Clickable
 
@@ -621,7 +621,7 @@ type Panel struct {
 
 func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.ListElement) D {
 	return widget.Border{
-		Color: color.RGBA{A: 200},
+		Color: color.NRGBA{A: 200},
 		Width: unit.Dp(0.5),
 	}.Layout(gtx, func(gtx C) D {
 		return layout.Flex{
@@ -663,8 +663,8 @@ func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.ListElement)
 										WithIcon(icons.ContentAdd),
 										WithSize(unit.Dp(15)),
 										WithInset(layout.UniformInset(unit.Dp(6))),
-										WithBgColor(color.RGBA{}),
-										WithIconColor(th.Color.Text),
+										WithBgColor(color.NRGBA{}),
+										WithIconColor(th.Fg),
 									).Layout(gtx)
 								}),
 							)
@@ -677,7 +677,7 @@ func (p *Panel) Layout(gtx C, th *material.Theme, tickets ...layout.ListElement)
 					gtx,
 					layout.Expanded(func(gtx C) D {
 						return Rect{
-							Color: color.RGBA{R: 240, G: 240, B: 240, A: 255},
+							Color: color.NRGBA{R: 240, G: 240, B: 240, A: 255},
 							Size:  layout.FPt(gtx.Constraints.Max),
 						}.Layout(gtx)
 					}),
@@ -719,13 +719,13 @@ type Ticket struct {
 func (t *Ticket) Layout(gtx C, th *material.Theme) D {
 	var (
 		barThickness   = unit.Dp(25)
-		sideBarColor   = color.RGBA{R: 50, G: 50, B: 50, A: 255}
-		bottomBarColor = color.RGBA{R: 220, G: 220, B: 220, A: 255}
+		sideBarColor   = color.NRGBA{R: 50, G: 50, B: 50, A: 255}
+		bottomBarColor = color.NRGBA{R: 220, G: 220, B: 220, A: 255}
 		minContentSize = gtx.Px(unit.Dp(150))
 	)
 	return widget.Border{
 		Width: unit.Dp(0.5),
-		Color: color.RGBA{A: 200},
+		Color: color.NRGBA{A: 200},
 	}.Layout(gtx, func(gtx C) D {
 		dims := layout.Inset{
 			Left: unit.Dp(25),
@@ -782,9 +782,7 @@ func (t *Ticket) content(gtx C, th *material.Theme) D {
 				return layout.Inset{
 					Top: unit.Dp(2),
 				}.Layout(gtx, func(gtx C) D {
-					th := *th
-					th.Color.Text = materials.AlphaMultiply(th.Color.Text, 200)
-					return material.Label(&th, unit.Dp(14), t.Category).Layout(gtx)
+					return material.Label(th, unit.Dp(14), t.Category).Layout(gtx)
 				})
 			}),
 			layout.Rigid(func(gtx C) D {
@@ -799,7 +797,7 @@ func (t *Ticket) content(gtx C, th *material.Theme) D {
 		gtx,
 		layout.Stacked(func(gtx C) D {
 			return Rect{
-				Color: color.RGBA{R: 255, G: 255, B: 255, A: 255},
+				Color: color.NRGBA{R: 255, G: 255, B: 255, A: 255},
 				Size: layout.FPt(image.Point{
 					X: gtx.Constraints.Max.X,
 					Y: dims.Size.Y,
@@ -815,7 +813,7 @@ func (t *Ticket) content(gtx C, th *material.Theme) D {
 	return dims
 }
 
-func (t *Ticket) bottomBar(gtx C, th *material.Theme, sz image.Point, c color.RGBA) D {
+func (t *Ticket) bottomBar(gtx C, th *material.Theme, sz image.Point, c color.NRGBA) D {
 	return layout.Stack{}.Layout(
 		gtx,
 		layout.Expanded(func(gtx C) D {
@@ -853,7 +851,7 @@ func (t *Ticket) bottomBar(gtx C, th *material.Theme, sz image.Point, c color.RG
 						WithIcon(icons.BackIcon),
 						WithSize(unit.Dp(12)),
 						WithInset(layout.UniformInset(unit.Dp(6))),
-						WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
+						WithIconColor(color.NRGBA{R: 0, G: 0, B: 0, A: 255}),
 						WithBgColor(c),
 					).Layout(gtx)
 				}),
@@ -863,7 +861,7 @@ func (t *Ticket) bottomBar(gtx C, th *material.Theme, sz image.Point, c color.RG
 						WithIcon(icons.ForwardIcon),
 						WithSize(unit.Dp(12)),
 						WithInset(layout.UniformInset(unit.Dp(6))),
-						WithIconColor(color.RGBA{R: 0, G: 0, B: 0, A: 255}),
+						WithIconColor(color.NRGBA{R: 0, G: 0, B: 0, A: 255}),
 						WithBgColor(c),
 					).Layout(gtx)
 				}),
@@ -872,7 +870,7 @@ func (t *Ticket) bottomBar(gtx C, th *material.Theme, sz image.Point, c color.RG
 	)
 }
 
-func (t *Ticket) sideBar(gtx C, sz image.Point, c color.RGBA) D {
+func (t *Ticket) sideBar(gtx C, sz image.Point, c color.NRGBA) D {
 	return layout.Stack{}.Layout(
 		gtx,
 		layout.Stacked(func(gtx C) D {
@@ -894,7 +892,7 @@ func (t *Ticket) sideBar(gtx C, sz image.Point, c color.RGBA) D {
 							WithIcon(icons.ContentEdit),
 							WithSize(unit.Dp(16)),
 							WithInset(layout.UniformInset(unit.Dp(2))),
-							WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+							WithIconColor(color.NRGBA{R: 255, G: 255, B: 255, A: 255}),
 							WithBgColor(c),
 						).Layout(gtx)
 					}),
@@ -905,7 +903,7 @@ func (t *Ticket) sideBar(gtx C, sz image.Point, c color.RGBA) D {
 								WithIcon(icons.ContentDelete),
 								WithSize(unit.Dp(16)),
 								WithInset(layout.UniformInset(unit.Dp(2))),
-								WithIconColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}),
+								WithIconColor(color.NRGBA{R: 255, G: 255, B: 255, A: 255}),
 								WithBgColor(c),
 							).Layout(gtx)
 						})
@@ -951,8 +949,8 @@ func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						btn := material.Button(th, &t.Cancel, "Cancel")
-						btn.Color = th.Color.Primary
-						btn.Background = color.RGBA{}
+						btn.Color = th.Fg
+						btn.Background = color.NRGBA{}
 						return btn.Layout(gtx)
 					}),
 					layout.Rigid(func(gtx C) D {
@@ -969,7 +967,7 @@ func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
 
 // ProjectForm renders a form for manipulating projects.
 type ProjectForm struct {
-	Name   materials.TextField
+	Name   component.TextField
 	Submit widget.Clickable
 	Cancel widget.Clickable
 }
@@ -996,8 +994,8 @@ func (form *ProjectForm) Layout(gtx C, th *material.Theme) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						btn := material.Button(th, &form.Cancel, "Cancel")
-						btn.Color = th.Color.Primary
-						btn.Background = color.RGBA{}
+						btn.Color = th.Fg
+						btn.Background = color.NRGBA{}
 						return btn.Layout(gtx)
 					}),
 					layout.Rigid(func(gtx C) D {
