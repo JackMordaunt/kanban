@@ -124,7 +124,7 @@ type RailChild struct {
 }
 
 // Destination is a rail item that represents a navigatable object.
-// Destinations are padded by default.
+// Destinations are pab+dded by default.
 func Destination(name string, w layout.Widget) RailChild {
 	return RailChild{
 		Name: name,
@@ -134,6 +134,17 @@ func Destination(name string, w layout.Widget) RailChild {
 
 func (r *Rail) next(key string) *widget.Clickable {
 	return (*widget.Clickable)(r.Map.New(key, unsafe.Pointer(&widget.Clickable{})))
+}
+
+// Selected reports which rail child was selected, if any.
+// Reports the first click encountered.
+func (r *Rail) Selected() (string, bool) {
+	for k, v := r.Map.Next(); r.Map.More(); k, v = r.Map.Next() {
+		if (*widget.Clickable)(v).Clicked() {
+			return k, true
+		}
+	}
+	return "", false
 }
 
 // Layout the rail with the given items.
@@ -163,10 +174,7 @@ func (r *Rail) Layout(gtx C, action layout.Widget, items ...RailChild) D {
 			return r.List.Layout(gtx, len(items), func(gtx C, ii int) D {
 				rc := items[ii]
 				return material.Clickable(gtx, r.next(rc.Name), func(gtx C) D {
-					return layout.UniformInset(unit.Dp(10)).Layout(gtx, func(gtx C) D {
-						gtx.Constraints.Min.X = gtx.Constraints.Max.X
-						return rc.W(gtx)
-					})
+					return rc.W(gtx)
 				})
 			})
 		}),
@@ -182,7 +190,7 @@ type Div struct {
 }
 
 func (d Div) Layout(gtx C) D {
-	// Draw a line as a very line.
+	// Draw a line as a very thin rectangle.
 	var sz image.Point
 	switch d.Axis {
 	case layout.Horizontal:

@@ -33,10 +33,6 @@ func main() {
 	db, err := func() (*storm.DB, error) {
 		path := filepath.Join(os.TempDir(), "kanban.db")
 		fmt.Printf("%s\n", path)
-		var init = false
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			init = true
-		}
 		db, err := storm.Open(path)
 		if err != nil {
 			return nil, fmt.Errorf("opening data file: %w", err)
@@ -44,15 +40,11 @@ func main() {
 		if err := db.Init(&kanban.Stage{}); err != nil {
 			return nil, err
 		}
-		if err := db.ReIndex(&kanban.Stage{}); err != nil {
+		if err := db.Init(&kanban.Ticket{}); err != nil {
 			return nil, err
 		}
-		if init {
-			for ii, stage := range []string{"Todo", "In Progress", "Testing", "Done"} {
-				if err := db.Save(&kanban.Stage{ID: ii + 1, Name: stage}); err != nil {
-					return nil, fmt.Errorf("creating default stages: %w", err)
-				}
-			}
+		if err := db.Init(&kanban.Project{}); err != nil {
+			return nil, err
 		}
 		return db, nil
 	}()
@@ -67,29 +59,29 @@ func main() {
 			Kanban: &kanban.Kanban{
 				Store: db,
 			},
-			// TODO: render dynamically from storage.
-			Panels: []Panel{
-				{
-					Label:     "Todo",
-					Color:     color.NRGBA{R: 0x91, G: 0x81, B: 0x8a, A: 220},
-					Thickness: unit.Dp(50),
-				},
-				{
-					Label:     "In Progress",
-					Color:     color.NRGBA{R: 0, G: 100, B: 200, A: 220},
-					Thickness: unit.Dp(50),
-				},
-				{
-					Label:     "Testing",
-					Color:     color.NRGBA{R: 200, G: 100, B: 0, A: 220},
-					Thickness: unit.Dp(50),
-				},
-				{
-					Label:     "Done",
-					Color:     color.NRGBA{R: 50, G: 200, B: 100, A: 220},
-					Thickness: unit.Dp(50),
-				},
-			},
+			// // TODO: render dynamically from storage.
+			// Panels: []Panel{
+			// 	{
+			// 		Label:     "Todo",
+			// 		Color:     color.NRGBA{R: 0x91, G: 0x81, B: 0x8a, A: 220},
+			// 		Thickness: unit.Dp(50),
+			// 	},
+			// 	{
+			// 		Label:     "In Progress",
+			// 		Color:     color.NRGBA{R: 0, G: 100, B: 200, A: 220},
+			// 		Thickness: unit.Dp(50),
+			// 	},
+			// 	{
+			// 		Label:     "Testing",
+			// 		Color:     color.NRGBA{R: 200, G: 100, B: 0, A: 220},
+			// 		Thickness: unit.Dp(50),
+			// 	},
+			// 	{
+			// 		Label:     "Done",
+			// 		Color:     color.NRGBA{R: 50, G: 200, B: 100, A: 220},
+			// 		Thickness: unit.Dp(50),
+			// 	},
+			// },
 		}
 		if err := ui.Loop(); err != nil {
 			log.Fatalf("error: %v", err)
@@ -109,8 +101,12 @@ type (
 // this object.
 type UI struct {
 	*app.Window
-	Kanban        *kanban.Kanban
-	Th            *material.Theme
+	Kanban *kanban.Kanban
+	Th     *material.Theme
+
+	// ActiveProject is the project being operated on.
+	ActiveProject kanban.ID
+
 	Panels        []Panel
 	Rail          Rail
 	TicketStates  Map
@@ -119,9 +115,9 @@ type UI struct {
 	TicketDetails TicketDetails
 	DeleteDialog  DeleteDialog
 	FocusedTicket struct {
-		ID    int
+		ID    kanban.ID
 		Index int
-		Stage int
+		Stage kanban.ID
 	}
 	CreateProjectButton widget.Clickable
 	ProjectForm         ProjectForm
@@ -156,18 +152,13 @@ func (ui *UI) Update(gtx C) {
 			case key.NameEscape:
 				ui.Clear()
 			case key.NameEnter, key.NameReturn:
-				// TODO: query for a single Ticket by ID, quickly.
-				tickets, err := ui.Kanban.Tickets()
-				if err != nil {
-					fmt.Printf("error: %v", err)
-					break
-				}
-				for _, t := range tickets {
-					t := t
-					if t.ID == ui.FocusedTicket.ID {
-						ui.InspectTicket(t)
-						break
-					}
+				var (
+					t kanban.Ticket
+				)
+				if err := ui.Kanban.Store.Find("ID", ui.FocusedTicket, &t); err != nil {
+					fmt.Printf("error: %v\n", err)
+				} else {
+					ui.InspectTicket(t)
 				}
 			case key.NameDownArrow:
 				ui.Refocus(NextTicket)
@@ -186,7 +177,7 @@ func (ui *UI) Update(gtx C) {
 			ui.AddTicket(panel.Label)
 		}
 	}
-	for s, ok := ui.TicketStates.Next(); ok; s, ok = ui.TicketStates.Next() {
+	for _, s := ui.TicketStates.Next(); ui.TicketStates.More(); _, s = ui.TicketStates.Next() {
 		t := (*Ticket)(s)
 		if ui.Modal != nil {
 			continue
@@ -234,7 +225,7 @@ func (ui *UI) Update(gtx C) {
 		ui.Clear()
 	}
 	if ui.DeleteDialog.Ok.Clicked() {
-		if err := ui.Kanban.Delete(ui.DeleteDialog.ID); err != nil {
+		if err := ui.Kanban.Finalize(ui.DeleteDialog.ID); err != nil {
 			fmt.Printf("error: %s\n", err)
 		}
 		ui.Clear()
@@ -254,6 +245,18 @@ func (ui *UI) Update(gtx C) {
 	if ui.ProjectForm.Cancel.Clicked() {
 		ui.Clear()
 	}
+	if ui.ProjectForm.Submit.Clicked() {
+		if err := ui.Kanban.Store.Save(&kanban.Project{
+			Name: ui.ProjectForm.Name.Text(),
+		}); err != nil {
+			log.Printf("saving new project: %v", err)
+		}
+	}
+	if p, ok := ui.Rail.Selected(); ok {
+		if projectID, err := strconv.Atoi(p); err == nil {
+			ui.ActiveProject = kanban.ID(projectID)
+		}
+	}
 }
 
 func (ui *UI) Layout(gtx C) D {
@@ -261,11 +264,42 @@ func (ui *UI) Layout(gtx C) D {
 	return layout.Flex{Axis: layout.Horizontal}.Layout(
 		gtx,
 		layout.Rigid(func(gtx C) D {
-			// TODO: render "active" destination in rail.
-			// TODO: model project with data primitive.
+			// @Todo: render "active" destination in rail.
 			gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
 			gtx.Constraints.Max.X = gtx.Px(unit.Dp(80))
 			gtx.Constraints.Min.X = 0
+			var (
+				projects []kanban.Project
+				rc       []RailChild
+			)
+			if err := ui.Kanban.Store.AllByIndex("ID", &projects); err != nil {
+				log.Printf("error: loading projects: %v", err)
+			}
+			for _, p := range projects {
+				p := p
+				rc = append(rc, Destination(p.ID.String(), func(gtx C) D {
+					return layout.Stack{
+						Alignment: layout.Center,
+					}.Layout(
+						gtx,
+						layout.Stacked(func(gtx C) D {
+							return layout.UniformInset(unit.Dp(10)).Layout(gtx, func(gtx C) D {
+								return material.Label(ui.Th, unit.Dp(16), p.Name).Layout(gtx)
+							})
+						}),
+						layout.Expanded(func(gtx C) D {
+							cs := gtx.Constraints
+							if p.ID == ui.ActiveProject {
+								return Rect{
+									Color: color.NRGBA{A: 100},
+									Size:  f32.Pt(float32(cs.Max.X), float32(cs.Min.Y)),
+								}.Layout(gtx)
+							}
+							return D{Size: image.Point{X: cs.Max.X, Y: cs.Min.Y}}
+						}),
+					)
+				}))
+			}
 			return ui.Rail.Layout(
 				gtx,
 				func(gtx C) D {
@@ -276,50 +310,52 @@ func (ui *UI) Layout(gtx C) D {
 						return btn.Layout(gtx)
 					})
 				},
-				Destination("kanban", func(gtx C) D {
-					return material.Label(ui.Th, unit.Dp(16), "Kanban").Layout(gtx)
-				}),
-				Destination("avisha", func(gtx C) D {
-					return material.Label(ui.Th, unit.Dp(16), "Avisha").Layout(gtx)
-				}),
-				Destination("watch", func(gtx C) D {
-					return material.Label(ui.Th, unit.Dp(16), "Watch").Layout(gtx)
-				}),
-				Destination("gopack", func(gtx C) D {
-					return material.Label(ui.Th, unit.Dp(16), "GoPack").Layout(gtx)
-				}),
+				rc...,
 			)
 		}),
 		layout.Flexed(1, func(gtx C) D {
 			return layout.Stack{}.Layout(
 				gtx,
 				layout.Stacked(func(gtx C) D {
+					if ui.ActiveProject.None() {
+						return D{}
+					}
 					ui.TicketStates.Begin()
-					var panels = make([]layout.FlexChild, len(ui.Panels))
-					for kk := range ui.Panels {
-						panel := &ui.Panels[kk]
-						panels[kk] = layout.Flexed(1, func(gtx C) D {
-							stage, _ := ui.Kanban.Stage(panel.Label)
-							var cards = make([]layout.ListElement, len(stage.Tickets))
-							for ii, ticket := range stage.Tickets {
-								id := strconv.Itoa(ticket.ID)
-								cards[ii] = func(gtx C, ii int) D {
-									t := (*Ticket)(ui.TicketStates.New(id, unsafe.Pointer(&Ticket{})))
-									t.Ticket = stage.Tickets[ii]
-									t.Stage = stage.Name
-									if ui.FocusedTicket.ID == t.ID {
-										return widget.Border{
-											Color: color.NRGBA{B: 200, A: 200},
-											Width: unit.Dp(2),
-										}.Layout(gtx, func(gtx C) D {
-											return t.Layout(gtx, ui.Th)
-										})
-									}
-									return t.Layout(gtx, ui.Th)
-								}
+					var (
+						project kanban.Project
+						stage   kanban.Stage
+						ticket  kanban.Ticket
+						t       *Ticket
+						panels  []layout.FlexChild
+					)
+					// @fixme show project creation hint when there are no projects.
+					if err := ui.Kanban.Store.One("ID", ui.ActiveProject, &project); err != nil {
+						log.Printf("error: project %v", err)
+					}
+					for _, id := range project.Stages {
+						if err := ui.Kanban.Store.One("ID", id, &stage); err != nil {
+							log.Printf("error: stage %v", err)
+						}
+						// render the stage panel.
+						for _, id := range stage.Tickets {
+							if err := ui.Kanban.Store.One("ID", id, &ticket); err != nil {
+								log.Printf("error: ticket %v", err)
 							}
-							return panel.Layout(gtx, ui.Th, cards...)
-						})
+							t = (*Ticket)(ui.TicketStates.New(strconv.Itoa(int(id)), unsafe.Pointer(&Ticket{})))
+							t.Ticket = ticket
+							t.Stage = stage.Name
+							panels = append(panels, layout.Flexed(1, func(gtx C) D {
+								if ui.FocusedTicket.ID == id {
+									return widget.Border{
+										Color: color.NRGBA{B: 200, A: 200},
+										Width: unit.Dp(2),
+									}.Layout(gtx, func(gtx C) D {
+										return t.Layout(gtx, ui.Th)
+									})
+								}
+								return t.Layout(gtx, ui.Th)
+							}))
+						}
 					}
 					return layout.Flex{
 						Axis:    layout.Horizontal,
@@ -354,49 +390,54 @@ const (
 // Refocus to the ticket in the given direction.
 // Allows movement between tickets and stages in sequential order.
 func (ui *UI) Refocus(d Direction) {
-	stages, err := ui.Kanban.ListStages()
-	if err != nil {
-		fmt.Printf("error: querying stages: %v", err)
-		return
-	}
-	for {
-		switch d {
-		case NextTicket:
-			ui.FocusedTicket.Index++
-			if ui.FocusedTicket.Index > len(stages[ui.FocusedTicket.Stage].Tickets) {
-				ui.FocusedTicket.Index = 1
-				ui.FocusedTicket.Stage++
-				if ui.FocusedTicket.Stage > len(stages)-1 {
-					ui.FocusedTicket.Stage = 0
-				}
-			}
-		case PreviousTicket:
-			ui.FocusedTicket.Index--
-			if ui.FocusedTicket.Index < 1 {
-				ui.FocusedTicket.Stage--
-				if ui.FocusedTicket.Stage < 0 {
-					ui.FocusedTicket.Stage = len(stages) - 1
-				}
-				ui.FocusedTicket.Index = len(stages[ui.FocusedTicket.Stage].Tickets)
-			}
-		case NextStage:
-			ui.FocusedTicket.Index = 1
-			ui.FocusedTicket.Stage++
-			if ui.FocusedTicket.Stage > len(stages)-1 {
-				ui.FocusedTicket.Stage = 0
-			}
-		case PreviousStage:
-			ui.FocusedTicket.Index = 1
-			ui.FocusedTicket.Stage--
-			if ui.FocusedTicket.Stage < 0 {
-				ui.FocusedTicket.Stage = len(stages) - 1
-			}
-		}
-		if stage := stages[ui.FocusedTicket.Stage]; !stage.Empty() {
-			break
-		}
-	}
-	ui.FocusedTicket.ID = stages[ui.FocusedTicket.Stage].Tickets[ui.FocusedTicket.Index-1].ID
+	// var (
+	// 	project kanban.Project
+	// 	stage kanban.Stage
+	// )
+	// if err := ui.Kanban.Store.Find("ID", ui.ActiveProject, &project); err != nil {
+	// 	log.Printf("error: %v", err)
+	// 	return
+	// }
+	// if err := ui.Kanban.Store.Find("ID", projet.St)
+
+	// for {
+	// 	switch d {
+	// 	case NextTicket:
+	// 		ui.FocusedTicket.Index++
+	// 		if ui.FocusedTicket.Index > len(stages[ui.FocusedTicket.Stage].Tickets) {
+	// 			ui.FocusedTicket.Index = 1
+	// 			ui.FocusedTicket.Stage++
+	// 			if ui.FocusedTicket.Stage > len(stages)-1 {
+	// 				ui.FocusedTicket.Stage = 0
+	// 			}
+	// 		}
+	// 	case PreviousTicket:
+	// 		ui.FocusedTicket.Index--
+	// 		if ui.FocusedTicket.Index < 1 {
+	// 			ui.FocusedTicket.Stage--
+	// 			if ui.FocusedTicket.Stage < 0 {
+	// 				ui.FocusedTicket.Stage = len(stages) - 1
+	// 			}
+	// 			ui.FocusedTicket.Index = len(stages[ui.FocusedTicket.Stage].Tickets)
+	// 		}
+	// 	case NextStage:
+	// 		ui.FocusedTicket.Index = 1
+	// 		ui.FocusedTicket.Stage++
+	// 		if ui.FocusedTicket.Stage > len(stages)-1 {
+	// 			ui.FocusedTicket.Stage = 0
+	// 		}
+	// 	case PreviousStage:
+	// 		ui.FocusedTicket.Index = 1
+	// 		ui.FocusedTicket.Stage--
+	// 		if ui.FocusedTicket.Stage < 0 {
+	// 			ui.FocusedTicket.Stage = len(stages) - 1
+	// 		}
+	// 	}
+	// 	if stage := stages[ui.FocusedTicket.Stage]; !stage.Empty() {
+	// 		break
+	// 	}
+	// }
+	// ui.FocusedTicket.ID = stages[ui.FocusedTicket.Stage].Tickets[ui.FocusedTicket.Index-1].ID
 }
 
 // Clear resets navigational state.
@@ -405,9 +446,9 @@ func (ui *UI) Clear() {
 	ui.TicketForm = TicketForm{}
 	ui.ProjectForm = ProjectForm{}
 	ui.FocusedTicket = struct {
-		ID    int
+		ID    kanban.ID
 		Index int
-		Stage int
+		Stage kanban.ID
 	}{}
 }
 
@@ -473,20 +514,18 @@ func (ui *UI) DeleteTicket(t kanban.Ticket) {
 //
 // TODO: tab navigation through form fields.
 type TicketForm struct {
-	Stage    string
-	Data     kanban.Ticket
-	Title    component.TextField
-	Category component.TextField
-	Summary  component.TextField
-	Details  component.TextField
-	Submit   widget.Clickable
-	Cancel   widget.Clickable
+	Stage   string
+	Data    kanban.Ticket
+	Title   component.TextField
+	Summary component.TextField
+	Details component.TextField
+	Submit  widget.Clickable
+	Cancel  widget.Clickable
 }
 
 func (form *TicketForm) Set(t kanban.Ticket) {
 	form.Data = t
 	form.Title.SetText(t.Title)
-	form.Category.SetText(t.Category)
 	form.Summary.SetText(t.Summary)
 	form.Details.SetText(t.Details)
 	// form.References.SetText(t.References)
@@ -496,12 +535,13 @@ func (form *TicketForm) Set(t kanban.Ticket) {
 // Note: No actual validation is done yet.
 func (form TicketForm) Validate() (kanban.Ticket, error) {
 	ticket := kanban.Ticket{
-		ID:       form.Data.ID,
-		Created:  form.Data.Created,
-		Title:    form.Title.Text(),
-		Details:  form.Details.Text(),
-		Summary:  form.Summary.Text(),
-		Category: form.Category.Text(),
+		Entity: kanban.Entity{
+			ID:      form.Data.ID,
+			Created: form.Data.Created,
+		},
+		Title:   form.Title.Text(),
+		Details: form.Details.Text(),
+		Summary: form.Summary.Text(),
 	}
 	return ticket, nil
 }
@@ -514,9 +554,6 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 		gtx,
 		layout.Rigid(func(gtx C) D {
 			return form.Title.Layout(gtx, th, "Title")
-		}),
-		layout.Rigid(func(gtx C) D {
-			return form.Category.Layout(gtx, th, "Category")
 		}),
 		layout.Rigid(func(gtx C) D {
 			return form.Summary.Layout(gtx, th, "Summary")
@@ -779,13 +816,6 @@ func (t *Ticket) content(gtx C, th *material.Theme) D {
 				return material.Label(th, unit.Dp(20), t.Title).Layout(gtx)
 			}),
 			layout.Rigid(func(gtx C) D {
-				return layout.Inset{
-					Top: unit.Dp(2),
-				}.Layout(gtx, func(gtx C) D {
-					return material.Label(th, unit.Dp(14), t.Category).Layout(gtx)
-				})
-			}),
-			layout.Rigid(func(gtx C) D {
 				return layout.Inset{Top: unit.Dp(10)}.Layout(gtx, func(gtx C) D {
 					return material.Body1(th, t.Summary).Layout(gtx)
 				})
@@ -926,9 +956,6 @@ func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
 		Axis: layout.Vertical,
 	}.Layout(
 		gtx,
-		layout.Rigid(func(gtx C) D {
-			return material.Body2(th, t.Category).Layout(gtx)
-		}),
 		layout.Rigid(func(gtx C) D {
 			return material.Body1(th, t.Summary).Layout(gtx)
 		}),

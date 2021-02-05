@@ -54,17 +54,23 @@ func (m *Map) New(k string, init unsafe.Pointer) unsafe.Pointer {
 	return m.data[k]
 }
 
-// Next iterates over the collection, returning the data and a boolean to indicate
-// the end.
+// Next iterates over the collection, returning the key-value pair.
 //
-// 	for v, ok := m.Next(); ok; v, ok = m.Next() {
+// 	for key, value := m.Next(); m.More(); key, value = m.Next() {
 //		t := (*T)(v)
 // 	}
 //
-func (m *Map) Next() (unsafe.Pointer, bool) {
+func (m *Map) Next() (key string, value unsafe.Pointer) {
 	if m.current >= len(m.index) {
-		return nil, false
+		return key, value
 	}
 	defer func() { m.current++ }()
-	return m.data[m.index[m.current]], m.current <= len(m.index)-1
+	key = m.index[m.current]
+	value = m.data[key]
+	return key, value
+}
+
+// More reports whether there is more data to iterate.
+func (m *Map) More() bool {
+	return m.current <= len(m.index)-1
 }
