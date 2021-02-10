@@ -3,57 +3,147 @@ package kanban
 import (
 	"errors"
 	"fmt"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/asdine/storm/v3"
 )
 
-// Kanban manipulates the model.
-type Kanban struct {
-	// Data access layer for querying and mutating data.
-	Store *storm.DB
+// Project
+// - represents some project that can be broken down into to discrete tasks, described by a name
+// - each project has it's own arbitrary pipeline of stages with which tickets move through left-to-right
+// - contains an ordered list of stages
+// - stages are re-orderable
+// - can be renamed
+// - can be deleted
+//
+// Stage
+// - represents an important part in the lifecycle of a task, described by a name
+// - contains an ordered list of tickets
+// - tickets are re-orderable
+// - tickets can advance back and forth between stages, typically linearly
+// - can be renamed
+// - can be deleted
+//
+// Ticket
+// - contains information about a task for a project
+// - is unique to a Project and sits within one of it's stages
+// - cannot occupy more than one stage
+// - can be edited
+// - can be deleted
+
+type IProject interface {
+	MakeStage(stage string)
+	ListStages() []Stage
+	MoveStage(stage string, dir Direction) bool
+	AssignTicket(stage string, t Ticket)
+	ProgressTicket(t Ticket)
+	RegressTicket(t Ticket)
+	ListTickets(stage string) []Ticket
+	MoveTicket(t Ticket, dir Direction) bool
+	FinalizeTicket(t Ticket)
 }
 
-// ID is a unique identifier encoded as an integer.
-type ID int
-
-// Entity is unique schema object that changes over time.
-type Entity struct {
-	ID      ID `storm:"id,index,increment"`
-	Created time.Time
+// Storage handles serialization of Project entities.
+type Storer interface {
+	Create(p *Project) error
+	Save(p *Project) error
+	Load(name string) (*Project, bool, error)
+	List() ([]*Project, error)
 }
 
 // Project is a context for a given set of tickets.
 type Project struct {
-	Entity `storm:"inline"`
-	Name   string `storm:"unique"`
-	// Stages lists stage IDs in order.
-	Stages Stages
+	// Name of project, must be unique.
+	Name string
+	// Stages owned by this project.
+	Stages    Stages
+	Finalized []Ticket
 }
 
-type Stages []ID
+var _ IProject = (*Project)(nil)
 
-func (stages *Stages) Swap(id ID, dir Direction) {
-	for ii := range *stages {
-		if (*stages)[ii] == id {
-			if bounds := ii + dir.Next(); bounds < 0 || bounds > len(*stages)-1 {
-				return
-			}
-			(*stages)[ii], (*stages)[ii+dir.Next()] = (*stages)[ii+dir.Next()], (*stages)[ii]
+// MakeStage assigns a ticket to the given stage.
+func (p *Project) MakeStage(name string) {
+	p.Stages = append(p.Stages, Stage{
+		Name: name,
+	})
+}
+
+func (p *Project) ListStages() []Stage {
+	return p.Stages
+}
+
+func (p *Project) MoveStage(name string, dir Direction) bool {
+	return p.Stages.Swap(name, dir)
+}
+
+// AssignTicket assigns a ticket to the given stage.
+func (p *Project) AssignTicket(stage string, ticket Ticket) {
+	p.Stages.Find(stage).Assign(ticket)
+}
+
+// ProgressTicket moves a ticket to the "next" stage.
+func (p *Project) ProgressTicket(ticket Ticket) {
+	for ii, s := range p.Stages {
+		if s.Contains(ticket) {
+			// @todo bounds check
+			p.Stages[ii+1].Assign(s.Take(ticket))
+			break
+		}
+	}
+}
+
+// RegressTicket moves a ticket to the "previous" stage.
+func (p *Project) RegressTicket(ticket Ticket) {
+	for ii, s := range p.Stages {
+		if s.Contains(ticket) {
+			// @todo bounds check
+			p.Stages[ii-1].Assign(s.Take(ticket))
+			break
+		}
+	}
+}
+
+// MoveTicket within a stage.
+func (p *Project) MoveTicket(ticket Ticket, dir Direction) bool {
+	// @implement
+	return false
+}
+
+func (p *Project) ListTickets(stage string) []Ticket {
+	return p.Stages.Find(stage).Tickets
+}
+
+// StageForTicket returns the stage containing the specified ticket.
+func (p *Project) StageForTicket(ticket Ticket) *Stage {
+	for ii, s := range p.Stages {
+		if s.Contains(ticket) {
+			return &p.Stages[ii]
+		}
+	}
+	return &Stage{}
+}
+
+// FinalizeTicket renders the ticket "complete" ad moves it into an archive.
+func (p *Project) FinalizeTicket(t Ticket) {
+	for _, s := range p.Stages {
+		if s.Contains(t) {
+			s.UnAssign(t)
+			p.Finalized = append(p.Finalized, t)
+			break
 		}
 	}
 }
 
 // Stage in the kanban pipeline, can hold a number of tickets.
 type Stage struct {
-	Entity `storm:"inline"`
-	Name   string
-	// Tickest lists ticket IDs in order.
-	Tickets []ID // @Todo abstract into "reorderable list", to use with project stage list as well.
+	Name    string
+	Tickets []Ticket
 }
 
-func (s *Stage) Assign(ticket ID) {
+// Assign appends a ticket id to the stage.
+func (s *Stage) Assign(ticket Ticket) {
 	for _, t := range s.Tickets {
 		if t == ticket {
 			return
@@ -62,7 +152,8 @@ func (s *Stage) Assign(ticket ID) {
 	s.Tickets = append(s.Tickets, ticket)
 }
 
-func (s *Stage) UnAssign(ticket ID) {
+// UnAssign removes a ticket id from the stage.
+func (s *Stage) UnAssign(ticket Ticket) {
 	for ii, t := range s.Tickets {
 		if t == ticket {
 			s.Tickets = append(s.Tickets[:ii], s.Tickets[ii+1:]...)
@@ -70,210 +161,75 @@ func (s *Stage) UnAssign(ticket ID) {
 	}
 }
 
-// FinalisedTicket is an inactive ticket kept for analytic purposes.
-type FinalisedTicket = Ticket
+// Stages is a list of Stage.
+type Stages []Stage
+
+// Swap the specified stage in the given direction.
+// Returns false when at a boundary, and therefore no swap can occur.
+func (stages *Stages) Swap(stage string, dir Direction) bool {
+	ii, ok := stages.Index(stage)
+	if !ok {
+		return false
+	}
+	if bounds := ii + dir.Next(); bounds < 0 || bounds > len(*stages)-1 {
+		return false
+	}
+	(*stages)[ii], (*stages)[ii+dir.Next()] = (*stages)[ii+dir.Next()], (*stages)[ii]
+	return true
+}
+
+// Find stage by name.
+func (stages *Stages) Find(name string) *Stage {
+	for ii, s := range *stages {
+		if s.Name == name {
+			return &(*stages)[ii]
+		}
+	}
+	return &Stage{}
+}
+
+// Index returns the index postition for the stage, false if no stage exists.
+func (stages *Stages) Index(name string) (int, bool) {
+	for ii, s := range *stages {
+		if s.Name == name {
+			return ii, true
+		}
+	}
+	return 0, false
+}
+
+// Take the specified ticket, if it exists.
+// Removes it from the stage.
+func (s *Stage) Take(ticket Ticket) Ticket {
+	for ii, t := range s.Tickets {
+		if t == ticket {
+			s.Tickets = append(s.Tickets[:ii], s.Tickets[ii+1:]...)
+			return t
+		}
+	}
+	return Ticket{}
+}
+
+// Contains returns true if the specified ticket exists in the stage.
+func (s *Stage) Contains(ticket Ticket) bool {
+	for _, t := range s.Tickets {
+		if t == ticket {
+			return true
+		}
+	}
+	return false
+}
 
 // Ticket in a stage.
 type Ticket struct {
-	Entity  `storm:"inline"`
-	Project ID
-	Stage   ID
-
 	// Title of the ticket.
 	Title string
 	// Summary contains short and concise overview of the ticket.
 	Summary string
 	// Details contains the full details of the ticket.
 	Details string
-}
-
-// ListStages returns a list of stages.
-func (k Kanban) ListStages(projectID ID) (stages []Stage, err error) {
-	var (
-		project Project
-	)
-	if err := k.Store.Find("ID", projectID, &project); err != nil {
-		return nil, fmt.Errorf("loading project: %v", err)
-	}
-	for _, stageID := range project.Stages {
-		var (
-			stage Stage
-		)
-		if err := k.Store.Find("ID", stageID, &stage); err != nil {
-			return stages, fmt.Errorf("loading stage: %v", err)
-		}
-		stages = append(stages, stage)
-	}
-	return stages, nil
-}
-
-// NextStage returns the stage that follows the specified one.
-func (k Kanban) NextStage(projectID ID, current ID) (string, error) {
-	stage, err := k.NextStageForDirection(projectID, current, Forward)
-	return stage.Name, err
-}
-
-// NextStage returns the stage that preceeds the specified one.
-func (k Kanban) PreviousStage(projectID ID, current ID) (string, error) {
-	stage, err := k.NextStageForDirection(projectID, current, Backward)
-	return stage.Name, err
-}
-
-// NextStageForDirection gets the next stage in the given direction.
-func (k Kanban) NextStageForDirection(projectID ID, current ID, dir Direction) (next Stage, err error) {
-	var (
-		project Project
-	)
-	if err := k.Store.Find("ID", projectID, &project); err != nil {
-		return Stage{}, fmt.Errorf("finding project: %v", err)
-	}
-	for ii, stage := range project.Stages {
-		if stage == current {
-			// @Todo bounds check.
-			return next, k.Store.Find("ID", project.Stages[ii+dir.Next()], &next)
-		}
-	}
-	return next, err
-}
-
-// MoveStage moves a stage one place in the given direction.
-func (k Kanban) MoveStage(projectID ID, id ID, dir Direction) error {
-	var (
-		project Project
-	)
-	if err := k.Store.Find("ID", projectID, &project); err != nil {
-		return fmt.Errorf("finding project: %v", err)
-	}
-	project.Stages.Swap(id, dir)
-	if err := k.Store.Save(&project); err != nil {
-		return fmt.Errorf("saving project: %v", err)
-	}
-	return nil
-}
-
-// Stage returns a stage by the given name.
-// Creates an empty stage if it doesn't exist.
-func (k *Kanban) Stage(name string) (stage Stage, err error) {
-	err = k.Store.Find("Name", name, &stage)
-	if errors.Is(err, storm.ErrNotFound) {
-		if err := k.Store.Save(&stage); err != nil {
-			return stage, err
-		}
-		return k.Stage(name)
-	}
-	return stage, err
-}
-
-// Move a ticket to the specified stage.
-// Assigns to the bottom of the target stage.
-func (k *Kanban) Move(stageID ID, ticketID ID) error {
-	var (
-		ticket       Ticket
-		currentStage Stage
-		targetStage  Stage
-	)
-	if err := k.Store.Find("ID", ticketID, &ticket); err != nil {
-		return err
-	}
-	if err := k.Store.Find("ID", ticket.Stage, &currentStage); err != nil {
-		return err
-	}
-	if err := k.Store.Find("ID", stageID, &targetStage); err != nil {
-		return err
-	}
-	ticket.Stage = targetStage.ID
-	currentStage.UnAssign(ticketID)
-	targetStage.Assign(ticketID)
-	if err := k.Store.Save(&ticket); err != nil {
-		return err
-	}
-	if err := k.Store.Save(&currentStage); err != nil {
-		return err
-	}
-	if err := k.Store.Save(&targetStage); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Progress a ticket to the next stage.
-func (k *Kanban) Progress(ticketID ID) error {
-	var (
-		ticket  Ticket
-		project Project
-		stageID ID
-	)
-	if err := k.Store.Find("ID", ticketID, &ticket); err != nil {
-		return err
-	}
-	if err := k.Store.Find("ID", ticket.Project, &project); err != nil {
-		return err
-	}
-	for ii, id := range project.Stages {
-		if id == ticket.Stage {
-			stageID = project.Stages[ii+1]
-		}
-	}
-	return k.Move(stageID, ticket.ID)
-}
-
-// Regress a ticket to the previous stage.
-func (k *Kanban) Regress(ticketID ID) error {
-	var (
-		ticket  Ticket
-		project Project
-		stageID ID
-	)
-	if err := k.Store.Find("ID", ticketID, &ticket); err != nil {
-		return err
-	}
-	if err := k.Store.Find("ID", ticket.Project, &project); err != nil {
-		return err
-	}
-	for ii, id := range project.Stages {
-		if id == ticket.Stage {
-			stageID = project.Stages[ii-1]
-		}
-	}
-	return k.Move(stageID, ticket.ID)
-}
-
-// Assign a ticket to a stage.
-func (k *Kanban) Assign(name string, ticket Ticket) error {
-	var (
-		stage Stage
-	)
-	if err := k.Store.Find("Name", name, &stage); err != nil {
-		return fmt.Errorf("finding stage %q: %v", name, err)
-	}
-	stage.Assign(ticket.ID)
-	ticket.Stage = stage.ID
-	if err := k.Store.Save(&ticket); err != nil {
-		return fmt.Errorf("saving ticket: %v", err)
-	}
-	if err := k.Store.Update(&stage); err != nil {
-		return fmt.Errorf("saving stage: %v", err)
-	}
-	return nil
-}
-
-// Finalize a ticket.
-// Either the ticket was completed, made irrelevant, or faulty in some manner.
-func (k *Kanban) Finalize(ticketID ID) error {
-	var (
-		ticket Ticket
-	)
-	if err := k.Store.Find("ID", ticketID, &ticket); err != nil {
-		return fmt.Errorf("ticket not exist: %v", err)
-	}
-	if err := k.Store.DeleteStruct(&ticket); err != nil {
-		return fmt.Errorf("deleting active ticket: %v", err)
-	}
-	return k.Store.Save(FinalisedTicket(ticket))
-}
-
-func (k *Kanban) Update(ticket Ticket) error {
-	return k.Store.Update(&ticket)
+	// Created when the ticket was created.
+	Created time.Time
 }
 
 // Direction encodes mutually exclusive directions.
@@ -306,11 +262,89 @@ func (dir Direction) Invert() Direction {
 	return dir
 }
 
-// None reports whether the ID represents a valid entity or is a zero value.
-func (id ID) None() bool {
-	return id < 1
+// MapStorer implements in-memory storage for Projects.
+type MapStorer struct {
+	Data map[string]Project
+	Err  error
 }
 
-func (id ID) String() string {
-	return strconv.Itoa(int(id))
+var _ Storer = (*MapStorer)(nil)
+
+func (s *MapStorer) Create(p *Project) error {
+	if len(strings.TrimSpace(p.Name)) == 0 {
+		return fmt.Errorf("project name required")
+	}
+	if _, ok := s.Data[p.Name]; ok {
+		return fmt.Errorf("project %q exists", p.Name)
+	}
+	s.Data[p.Name] = *p
+	return nil
+}
+
+func (s *MapStorer) Save(p *Project) error {
+	if _, ok := s.Data[p.Name]; ok {
+		s.Data[p.Name] = *p
+	} else {
+		return fmt.Errorf("project %q does not exist", p.Name)
+	}
+	return nil
+}
+
+func (s *MapStorer) Load(name string) (*Project, bool, error) {
+	if p, ok := s.Data[name]; ok {
+		return &p, ok, nil
+	}
+	return nil, false, nil
+}
+
+func (s *MapStorer) List() (list []*Project, err error) {
+	for _, p := range s.Data {
+		list = append(list, &p)
+	}
+	return list, nil
+}
+
+// StormStorer implements Project storage using storm db.
+type StormStorer struct {
+	DB *storm.DB
+}
+
+var _ Storer = (*StormStorer)(nil)
+
+func (s *StormStorer) Create(p *Project) error {
+	if len(strings.TrimSpace(p.Name)) == 0 {
+		return fmt.Errorf("project name required")
+	}
+	return s.DB.Save((*struct {
+		Name      string `storm:"id,unique,index"`
+		Stages    Stages
+		Finalized []Ticket
+	})(p))
+}
+
+func (s *StormStorer) Save(p *Project) error {
+	if len(strings.TrimSpace(p.Name)) == 0 {
+		return fmt.Errorf("project name required")
+	}
+	return s.DB.Update((*struct {
+		Name      string `storm:"id,unique,index"`
+		Stages    Stages
+		Finalized []Ticket
+	})(p))
+}
+
+func (s *StormStorer) Load(name string) (*Project, bool, error) {
+	var p Project
+	if err := s.DB.Find("Name", name, &p); err != nil {
+		if errors.Is(err, storm.ErrNotFound) {
+			return &p, false, nil
+		} else {
+			return &p, false, err
+		}
+	}
+	return &p, true, nil
+}
+
+func (s *StormStorer) List() (list []*Project, err error) {
+	return list, s.DB.All(&list)
 }
