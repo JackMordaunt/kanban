@@ -38,7 +38,6 @@ func (f *TicketForm) Set(t *kanban.Ticket) {
 }
 
 // Submit validates inputs and writes to the ticket.
-// @Todo validation.
 func (f TicketForm) Submit() error {
 	*f.Ticket = kanban.Ticket{
 		Title:   f.Title.Text(),
@@ -211,13 +210,21 @@ type Ticket struct {
 //
 // To get around this I used a macro and manually stacked things sized exactly
 // to the content, rather than the maximum Y.
-func (t *Ticket) Layout(gtx C, th *material.Theme) D {
+func (t *Ticket) Layout(gtx C, th *material.Theme, focused bool) D {
 	var (
 		barThickness   = unit.Dp(25)
 		sideBarColor   = color.NRGBA{R: 50, G: 50, B: 50, A: 255}
 		bottomBarColor = color.NRGBA{R: 220, G: 220, B: 220, A: 255}
 		minContentSize = gtx.Px(unit.Dp(150))
 	)
+	if focused {
+		return widget.Border{
+			Color: color.NRGBA{B: 200, A: 200},
+			Width: unit.Dp(2),
+		}.Layout(gtx, func(gtx C) D {
+			return t.Layout(gtx, th, false)
+		})
+	}
 	return widget.Border{
 		Width: unit.Dp(0.5),
 		Color: color.NRGBA{A: 200},

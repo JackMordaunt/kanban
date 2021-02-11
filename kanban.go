@@ -87,8 +87,9 @@ func (p *Project) AssignTicket(stage string, ticket Ticket) {
 func (p *Project) ProgressTicket(ticket Ticket) {
 	for ii, s := range p.Stages {
 		if s.Contains(ticket) {
-			// @todo bounds check
-			p.Stages[ii+1].Assign(s.Take(ticket))
+			if ii < len(p.Stages)-1 {
+				p.Stages[ii+1].Assign(p.Stages[ii].Take(ticket))
+			}
 			break
 		}
 	}
@@ -98,8 +99,9 @@ func (p *Project) ProgressTicket(ticket Ticket) {
 func (p *Project) RegressTicket(ticket Ticket) {
 	for ii, s := range p.Stages {
 		if s.Contains(ticket) {
-			// @todo bounds check
-			p.Stages[ii-1].Assign(s.Take(ticket))
+			if ii > 0 {
+				p.Stages[ii-1].Assign(p.Stages[ii].Take(ticket))
+			}
 			break
 		}
 	}
@@ -201,13 +203,8 @@ func (stages *Stages) Index(name string) (int, bool) {
 // Take the specified ticket, if it exists.
 // Removes it from the stage.
 func (s *Stage) Take(ticket Ticket) Ticket {
-	for ii, t := range s.Tickets {
-		if t == ticket {
-			s.Tickets = append(s.Tickets[:ii], s.Tickets[ii+1:]...)
-			return t
-		}
-	}
-	return Ticket{}
+	s.UnAssign(ticket)
+	return ticket
 }
 
 // Contains returns true if the specified ticket exists in the stage.
@@ -264,11 +261,18 @@ func (dir Direction) Invert() Direction {
 
 // MapStorer implements in-memory storage for Projects.
 type MapStorer struct {
-	Data map[string]Project
-	Err  error
+	Data  map[string]Project
+	Order []string
+	Err   error
 }
 
 var _ Storer = (*MapStorer)(nil)
+
+func (s MapStorer) New() *MapStorer {
+	return &MapStorer{
+		Data: make(map[string]Project),
+	}
+}
 
 func (s *MapStorer) Create(p *Project) error {
 	if len(strings.TrimSpace(p.Name)) == 0 {
@@ -278,6 +282,7 @@ func (s *MapStorer) Create(p *Project) error {
 		return fmt.Errorf("project %q exists", p.Name)
 	}
 	s.Data[p.Name] = *p
+	s.Order = append(s.Order, p.Name)
 	return nil
 }
 
@@ -298,15 +303,25 @@ func (s *MapStorer) Load(name string) (*Project, bool, error) {
 }
 
 func (s *MapStorer) List() (list []*Project, err error) {
-	for _, p := range s.Data {
-		list = append(list, &p)
+	for _, name := range s.Order {
+		if p, ok := s.Data[name]; ok {
+			list = append(list, &p)
+		}
 	}
 	return list, nil
 }
 
+// @todo move storer impl into package.
+
 // StormStorer implements Project storage using storm db.
 type StormStorer struct {
 	DB *storm.DB
+}
+
+// ProjectSchema is a schema representation of a project.
+type ProjectSchema struct {
+	Name string `storm:"id"`
+	Project
 }
 
 var _ Storer = (*StormStorer)(nil)
@@ -315,36 +330,38 @@ func (s *StormStorer) Create(p *Project) error {
 	if len(strings.TrimSpace(p.Name)) == 0 {
 		return fmt.Errorf("project name required")
 	}
-	return s.DB.Save((*struct {
-		Name      string `storm:"id,unique,index"`
-		Stages    Stages
-		Finalized []Ticket
-	})(p))
+	fmt.Printf("creating project: %v\n ", p)
+	return s.DB.Save(&ProjectSchema{Name: p.Name, Project: *p})
 }
 
 func (s *StormStorer) Save(p *Project) error {
 	if len(strings.TrimSpace(p.Name)) == 0 {
 		return fmt.Errorf("project name required")
 	}
-	return s.DB.Update((*struct {
-		Name      string `storm:"id,unique,index"`
-		Stages    Stages
-		Finalized []Ticket
-	})(p))
+	return s.DB.Update(&ProjectSchema{Name: p.Name, Project: *p})
 }
 
 func (s *StormStorer) Load(name string) (*Project, bool, error) {
-	var p Project
+	var p ProjectSchema
 	if err := s.DB.Find("Name", name, &p); err != nil {
 		if errors.Is(err, storm.ErrNotFound) {
-			return &p, false, nil
+			return &p.Project, false, nil
 		} else {
-			return &p, false, err
+			return &p.Project, false, err
 		}
 	}
-	return &p, true, nil
+	return &p.Project, true, nil
 }
 
 func (s *StormStorer) List() (list []*Project, err error) {
-	return list, s.DB.All(&list)
+	var (
+		projects []*ProjectSchema
+	)
+	if err := s.DB.All(&projects); err != nil {
+		return nil, fmt.Errorf("loading projects: %v", err)
+	}
+	for _, p := range projects {
+		list = append(list, &p.Project)
+	}
+	return list, nil
 }

@@ -45,7 +45,8 @@ func (r *Rail) next(key string) *widget.Clickable {
 // Selected reports which rail child was selected, if any.
 // Reports the first click encountered.
 func (r *Rail) Selected() (string, bool) {
-	for k, v := r.Map.Next(); r.Map.More(); k, v = r.Map.Next() {
+	for r.Map.More() {
+		k, v := r.Map.Next()
 		if (*widget.Clickable)(v).Clicked() {
 			return k, true
 		}
