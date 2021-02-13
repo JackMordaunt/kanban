@@ -1,14 +1,12 @@
-package kanban
-
-import (
-	"errors"
-	"fmt"
-	"strings"
-	"time"
-
-	"github.com/asdine/storm/v3"
-)
-
+// Package kanban implements Kanban logic.
+//
+// Kanban is Project oriented, where a Project holds the context for given set
+// of Stages and Tickets.
+//
+// Projects are independent of each other.
+//
+// Notes:
+//
 // Project
 // - represents some project that can be broken down into to discrete tasks, described by a name
 // - each project has it's own arbitrary pipeline of stages with which tickets move through left-to-right
@@ -31,26 +29,12 @@ import (
 // - cannot occupy more than one stage
 // - can be edited
 // - can be deleted
+package kanban
 
-type IProject interface {
-	MakeStage(stage string)
-	ListStages() []Stage
-	MoveStage(stage string, dir Direction) bool
-	AssignTicket(stage string, t Ticket)
-	ProgressTicket(t Ticket)
-	RegressTicket(t Ticket)
-	ListTickets(stage string) []Ticket
-	MoveTicket(t Ticket, dir Direction) bool
-	FinalizeTicket(t Ticket)
-}
-
-// Storage handles serialization of Project entities.
-type Storer interface {
-	Create(p *Project) error
-	Save(p *Project) error
-	Load(name string) (*Project, bool, error)
-	List() ([]*Project, error)
-}
+import (
+	"fmt"
+	"time"
+)
 
 // Project is a context for a given set of tickets.
 type Project struct {
@@ -60,8 +44,6 @@ type Project struct {
 	Stages    Stages
 	Finalized []Ticket
 }
-
-var _ IProject = (*Project)(nil)
 
 // MakeStage assigns a ticket to the given stage.
 func (p *Project) MakeStage(name string) {
@@ -259,109 +241,9 @@ func (dir Direction) Invert() Direction {
 	return dir
 }
 
-// MapStorer implements in-memory storage for Projects.
-type MapStorer struct {
-	Data  map[string]Project
-	Order []string
-	Err   error
-}
-
-var _ Storer = (*MapStorer)(nil)
-
-func (s MapStorer) New() *MapStorer {
-	return &MapStorer{
-		Data: make(map[string]Project),
+func (p *Project) String() string {
+	if p == nil {
+		return "<nil>"
 	}
-}
-
-func (s *MapStorer) Create(p *Project) error {
-	if len(strings.TrimSpace(p.Name)) == 0 {
-		return fmt.Errorf("project name required")
-	}
-	if _, ok := s.Data[p.Name]; ok {
-		return fmt.Errorf("project %q exists", p.Name)
-	}
-	s.Data[p.Name] = *p
-	s.Order = append(s.Order, p.Name)
-	return nil
-}
-
-func (s *MapStorer) Save(p *Project) error {
-	if _, ok := s.Data[p.Name]; ok {
-		s.Data[p.Name] = *p
-	} else {
-		return fmt.Errorf("project %q does not exist", p.Name)
-	}
-	return nil
-}
-
-func (s *MapStorer) Load(name string) (*Project, bool, error) {
-	if p, ok := s.Data[name]; ok {
-		return &p, ok, nil
-	}
-	return nil, false, nil
-}
-
-func (s *MapStorer) List() (list []*Project, err error) {
-	for _, name := range s.Order {
-		if p, ok := s.Data[name]; ok {
-			list = append(list, &p)
-		}
-	}
-	return list, nil
-}
-
-// @todo move storer impl into package.
-
-// StormStorer implements Project storage using storm db.
-type StormStorer struct {
-	DB *storm.DB
-}
-
-// ProjectSchema is a schema representation of a project.
-type ProjectSchema struct {
-	Name string `storm:"id"`
-	Project
-}
-
-var _ Storer = (*StormStorer)(nil)
-
-func (s *StormStorer) Create(p *Project) error {
-	if len(strings.TrimSpace(p.Name)) == 0 {
-		return fmt.Errorf("project name required")
-	}
-	fmt.Printf("creating project: %v\n ", p)
-	return s.DB.Save(&ProjectSchema{Name: p.Name, Project: *p})
-}
-
-func (s *StormStorer) Save(p *Project) error {
-	if len(strings.TrimSpace(p.Name)) == 0 {
-		return fmt.Errorf("project name required")
-	}
-	return s.DB.Update(&ProjectSchema{Name: p.Name, Project: *p})
-}
-
-func (s *StormStorer) Load(name string) (*Project, bool, error) {
-	var p ProjectSchema
-	if err := s.DB.One("Name", name, &p); err != nil {
-		if errors.Is(err, storm.ErrNotFound) {
-			return &p.Project, false, nil
-		} else {
-			return &p.Project, false, err
-		}
-	}
-	return &p.Project, true, nil
-}
-
-func (s *StormStorer) List() (list []*Project, err error) {
-	var (
-		projects []*ProjectSchema
-	)
-	if err := s.DB.All(&projects); err != nil {
-		return nil, fmt.Errorf("loading projects: %v", err)
-	}
-	for _, p := range projects {
-		list = append(list, &p.Project)
-	}
-	return list, nil
+	return fmt.Sprintf("%v", *p)
 }
