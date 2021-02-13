@@ -106,7 +106,7 @@ func (ui *UI) Loop() error {
 }
 
 // Shutdown does cleanup.
-func (ui UI) Shutdown() error {
+func (ui *UI) Shutdown() error {
 	if err := ui.Storage.Save(ui.Project); err != nil {
 		return fmt.Errorf("saving project: %v", err)
 	}
