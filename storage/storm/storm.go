@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 
 	"git.sr.ht/~jackmordaunt/kanban"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
@@ -19,7 +18,7 @@ type Storer struct {
 	DB *storm.DB
 }
 
-// Schema is a database representation of a project.
+// Schema is a database representation of a kanban.Project.
 type Schema struct {
 	ID      string `storm:"id"`
 	Project kanban.Project
@@ -42,16 +41,10 @@ func Open(path string) (*Storer, error) {
 }
 
 func (s *Storer) Create(p kanban.Project) error {
-	return s.DB.Save(&Schema{
-		ID:      p.Name,
-		Project: p,
-	})
+	return s.DB.Save(&Schema{ID: p.Name, Project: p})
 }
 
 func (s *Storer) Save(p *kanban.Project) error {
-	if len(strings.TrimSpace(p.Name)) == 0 {
-		return fmt.Errorf("project name required")
-	}
 	return s.DB.Update(&Schema{ID: p.Name, Project: *p})
 }
 
@@ -75,6 +68,7 @@ func (s *Storer) List() (list []*kanban.Project, err error) {
 		return nil, fmt.Errorf("loading projects: %v", err)
 	}
 	for _, p := range projects {
+		p := p
 		list = append(list, &p.Project)
 	}
 	return list, nil
