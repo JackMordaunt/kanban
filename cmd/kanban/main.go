@@ -84,23 +84,52 @@ type (
 	D = layout.Dimensions
 )
 
-// UI is the high level object that contains all global state.
+// UI is the high level object that contains UI-global state.
+//
 // Anything that needs to integrate with the external system is allocated on
 // this object.
+//
+// UI has three primary methods "Loop", "Update" and "Layout".
+// Loop starts the event loop and runs until the program terminates.
+// Update changes state based on events.
+// Layout takes the UI state and renders using Gio primitives.
 type UI struct {
+	// Window is a reference to the window handle.
 	*app.Window
+
+	// Th contains theme data application wide.
+	Th *material.Theme
+
+	// Storage driver responsible for allocating Project objects.
 	Storage kanban.Storer
-	Th      *material.Theme
+
+	// Project is the currently active kanban Project.
+	// Contains the state and methods for kanban operations.
+	// Points to memory allocated by the storage implementation.
+	// nil value implies no active project.
 	Project *kanban.Project
 
+	// Panels render the active Project stages.
+	// Shares the same lifetime as the active project.
 	Panels []*control.Panel
 
-	Rail          control.Rail
-	TicketStates  state.Map
-	Modal         layout.Widget
+	// Rail allows intra-project navigation as a side bar.
+	// When a Project item is clicked, that Project is loaded from storage and
+	// becomes the active Project.
+	Rail control.Rail
+
+	// TicketStates allocates memory for the Project's tickets and assocated
+	// UI state.
+	TicketStates state.Map
+
+	// Modal is rendered atop the main content when not nil.
+	Modal layout.Widget
+
+	// Form state.
 	TicketForm    TicketForm
 	TicketDetails TicketDetails
 	DeleteDialog  DeleteDialog
+	ProjectForm   ProjectForm
 
 	// FocusedTicket struct {
 	// 	ID    kanban.ID
@@ -109,9 +138,9 @@ type UI struct {
 	// }
 
 	CreateProjectButton widget.Clickable
-	ProjectForm         ProjectForm
 }
 
+// Loop runs the event loop until terminated.
 func (ui *UI) Loop() error {
 	var (
 		ops    op.Ops
@@ -139,6 +168,8 @@ func (ui UI) Shutdown() error {
 	return nil
 }
 
+// Update state based on events.
+//
 // TODO: investigate best way to handle errors. Some errors are for the user
 // and others are for the devs.
 // Currently errors are just printed; not great for windowed applications.
@@ -265,6 +296,7 @@ func (ui *UI) Update(gtx C) {
 	}
 }
 
+// Layout UI.
 func (ui *UI) Layout(gtx C) D {
 	key.InputOp{Tag: ui}.Add(gtx.Ops)
 	return layout.Flex{
