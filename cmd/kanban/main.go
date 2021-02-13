@@ -35,7 +35,7 @@ var (
 )
 
 func init() {
-	pflag.BoolVar(&MemStorage, "mem-storage", true, "store entities in memory")
+	pflag.BoolVar(&MemStorage, "mem-storage", false, "store entities in memory")
 	pflag.Parse()
 }
 
@@ -59,10 +59,12 @@ func main() {
 			if err != nil {
 				log.Fatalf("error: initializing data: %v", err)
 			}
-			defer db.Close()
 			return &kanban.StormStorer{DB: db}
 		}
 	}()
+	if closer, ok := storage.(interface{ Close() error }); ok {
+		defer closer.Close()
+	}
 	go func() {
 		ui := UI{
 			Window:  app.NewWindow(app.Title("Kanban")),
