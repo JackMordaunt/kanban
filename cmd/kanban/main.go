@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -31,7 +32,13 @@ func main() {
 		if MemStorage {
 			return mem.New(), nil
 		} else {
-			return storm.Open(filepath.Join(os.TempDir(), "kanban.db"))
+			data, err := app.DataDir()
+			if err != nil {
+				return nil, fmt.Errorf("data dir: %v", err)
+			}
+			db := filepath.Join(data, "kanban.db")
+			fmt.Printf("%s\n", db)
+			return storm.Open(db)
 		}
 	}()
 	if err != nil {
