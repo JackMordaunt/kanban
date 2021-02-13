@@ -84,6 +84,15 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
 					}),
 					layout.Rigid(func(gtx C) D {
+						btn := material.Button(th, &form.CancelBtn, "Cancel")
+						btn.Color = th.Fg
+						btn.Background = color.NRGBA{}
+						return btn.Layout(gtx)
+					}),
+					layout.Rigid(func(gtx C) D {
+						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
+					}),
+					layout.Rigid(func(gtx C) D {
 						return material.Button(th, &form.SubmitBtn, "Submit").Layout(gtx)
 					}),
 				)
