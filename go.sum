@@ -3,6 +3,8 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037/go.mod h1:H6x//7
 gioui.org v0.0.0-20210116085804-99bfa6a33cdf/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
 gioui.org v0.0.0-20210127212131-b698c8ed8229 h1:K60CRdV3HIRwujzfukYpS8DtcwhKljeaTa7BGjGNkmA=
 gioui.org v0.0.0-20210127212131-b698c8ed8229/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
+gioui.org v0.0.0-20210210205757-7286b075e2fb h1:UKF3b0qSQED+HO1weY+H4GpYJALVn3suJxkavMgNDVQ=
+gioui.org v0.0.0-20210210205757-7286b075e2fb/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
 gioui.org/x v0.0.0-20210120222453-b55819bc712b h1:C7/1fHOBkcypkgWopz8Mf+eDJggTWQWlL315KjhDVDQ=
 gioui.org/x v0.0.0-20210120222453-b55819bc712b/go.mod h1:+CDNGkslHDIe1EK2Q4E0G98qRllCaQrL6qtjBhBjSAo=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
@@ -48,6 +50,8 @@ golang.org/x/exp v0.0.0-20191002040644-a1355ae1e2c3/go.mod h1:NOZ3BPKG0ec/BKJQgn
 golang.org/x/exp v0.0.0-20201229011636-eab1b5eb1a03/go.mod h1:I6l2HNBLBZEcrOoCpyKLdY2lHoRZ8lI4x60KMCQDft4=
 golang.org/x/exp v0.0.0-20210126221216-84987778548c h1:sWZb7hc7UoMhB5/VYk5+nsHuiHq8J5l0osfBYs9C3gw=
 golang.org/x/exp v0.0.0-20210126221216-84987778548c/go.mod h1:I6l2HNBLBZEcrOoCpyKLdY2lHoRZ8lI4x60KMCQDft4=
+golang.org/x/exp v0.0.0-20210212053707-62dc52270d37 h1:8LMx3JFCswBZrnLWtxzpogDG5g1Hb7KWy/16Msz0hQk=
+golang.org/x/exp v0.0.0-20210212053707-62dc52270d37/go.mod h1:I6l2HNBLBZEcrOoCpyKLdY2lHoRZ8lI4x60KMCQDft4=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
 golang.org/x/image v0.0.0-20200618115811-c13761719519 h1:1e2ufUJNM3lCHEY5jIgac/7UTjd6cgJNdatjPdFWf34=
