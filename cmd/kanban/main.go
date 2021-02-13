@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"gioui.org/font/gofont"
+	"gioui.org/unit"
 	"gioui.org/widget/material"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
 	"git.sr.ht/~jackmordaunt/kanban/storage/mem"
@@ -49,7 +50,7 @@ func main() {
 	}
 	go func() {
 		ui := UI{
-			Window:  app.NewWindow(app.Title("Kanban")),
+			Window:  app.NewWindow(app.Title("Kanban"), app.MinSize(unit.Dp(700), unit.Dp(250))),
 			Th:      material.NewTheme(gofont.Collection()),
 			Storage: storage,
 		}
