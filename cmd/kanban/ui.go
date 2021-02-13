@@ -173,6 +173,7 @@ func (ui *UI) Update(gtx C) {
 				log.Printf("loading project %q: %v", p, err)
 			}
 			if ok {
+				ui.Clear()
 				ui.Project = project
 				ui.Panels = func() (panels []*control.Panel) {
 					for _, s := range project.Stages {
@@ -426,6 +427,7 @@ func (ui *UI) Clear() {
 	ui.Modal = nil
 	ui.TicketForm = TicketForm{}
 	ui.ProjectForm = ProjectForm{}
+	ui.DeleteDialog = DeleteDialog{}
 	// @cleanup
 	// ui.FocusedTicket = struct {
 	// 	ID    kanban.ID
