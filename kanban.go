@@ -343,7 +343,7 @@ func (s *StormStorer) Save(p *Project) error {
 
 func (s *StormStorer) Load(name string) (*Project, bool, error) {
 	var p ProjectSchema
-	if err := s.DB.Find("Name", name, &p); err != nil {
+	if err := s.DB.One("Name", name, &p); err != nil {
 		if errors.Is(err, storm.ErrNotFound) {
 			return &p.Project, false, nil
 		} else {
