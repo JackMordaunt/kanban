@@ -162,6 +162,11 @@ func (ui *UI) Update(gtx C) {
 		ui.Clear()
 	}
 	if p, ok := ui.Rail.Selected(); ok {
+		if ui.Project != nil {
+			if err := ui.Storage.Save(ui.Project); err != nil {
+				log.Printf("saving project: %v", err)
+			}
+		}
 		if ui.Project == nil || ui.Project.Name != p {
 			project, ok, err := ui.Storage.Load(p)
 			if err != nil {
@@ -180,7 +185,6 @@ func (ui *UI) Update(gtx C) {
 					return panels
 				}()
 			}
-
 		}
 	}
 	if ui.ProjectForm.Cancel.Clicked() {
