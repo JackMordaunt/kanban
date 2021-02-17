@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"git.sr.ht/~jackmordaunt/kanban/storage/storm"
+	"git.sr.ht/~jackmordaunt/kanban/storage/lazy"
 
 	"github.com/spf13/pflag"
 
@@ -39,7 +39,7 @@ func main() {
 			}
 			db := filepath.Join(data, "kanban.db")
 			fmt.Printf("%s\n", db)
-			return storm.Open(db)
+			return lazy.Open(db)
 		}
 	}()
 	if err != nil {

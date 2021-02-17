@@ -32,26 +32,26 @@ func (s *Storer) Create(p kanban.Project) error {
 	return nil
 }
 
-func (s *Storer) Save(p *kanban.Project) error {
+func (s *Storer) Save(p kanban.Project) error {
 	if _, ok := s.Data[p.Name]; ok {
-		s.Data[p.Name] = *p
+		s.Data[p.Name] = p
 	} else {
 		return fmt.Errorf("project %q does not exist", p.Name)
 	}
 	return nil
 }
 
-func (s *Storer) Load(name string) (*kanban.Project, bool, error) {
+func (s *Storer) Load(name string) (kanban.Project, bool, error) {
 	if p, ok := s.Data[name]; ok {
-		return &p, ok, nil
+		return p, ok, nil
 	}
-	return nil, false, nil
+	return kanban.Project{}, false, nil
 }
 
-func (s *Storer) List() (list []*kanban.Project, err error) {
+func (s *Storer) List() (list []kanban.Project, err error) {
 	for _, name := range s.Order {
 		if p, ok := s.Data[name]; ok {
-			list = append(list, &p)
+			list = append(list, p)
 		}
 	}
 	return list, nil

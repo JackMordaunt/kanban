@@ -48,6 +48,11 @@ type UI struct {
 	// Storage driver responsible for allocating Project objects.
 	Storage storage.Storer
 
+	// Projects is an in-memory list of the projects.
+	// Refreshed from Storage before every frame.
+	// Save to Storage after every frame.
+	Projects Projects
+
 	// Project is the currently active kanban Project.
 	// Contains the state and methods for kanban operations.
 	// Points to memory allocated by the storage implementation.
@@ -97,8 +102,10 @@ func (ui *UI) Loop() error {
 			return event.Err
 		case system.FrameEvent:
 			gtx := layout.NewContext(&ops, event)
+			ui.Load()
 			ui.Update(gtx)
 			ui.Layout(gtx)
+			ui.Save()
 			event.Frame(gtx.Ops)
 		}
 	}
@@ -107,9 +114,9 @@ func (ui *UI) Loop() error {
 
 // Shutdown does cleanup.
 func (ui *UI) Shutdown() error {
-	if err := ui.Storage.Save(ui.Project); err != nil {
-		return fmt.Errorf("saving project: %v", err)
-	}
+	// if err := ui.Storage.Save(*ui.Project); err != nil {
+	// 	return fmt.Errorf("saving project: %v", err)
+	// }
 	return nil
 }
 
@@ -162,16 +169,17 @@ func (ui *UI) Update(gtx C) {
 		ui.Clear()
 	}
 	if p, ok := ui.Rail.Selected(); ok {
-		if ui.Project != nil {
-			if err := ui.Storage.Save(ui.Project); err != nil {
-				log.Printf("saving project: %v", err)
-			}
-		}
+		// if ui.Project != nil {
+		// 	if err := ui.Storage.Save(ui.Project); err != nil {
+		// 		log.Printf("saving project: %v", err)
+		// 	}
+		// }
 		if ui.Project == nil || ui.Project.Name != p {
-			project, ok, err := ui.Storage.Load(p)
-			if err != nil {
-				log.Printf("loading project %q: %v", p, err)
-			}
+			project, ok := ui.Projects.Find(p)
+			// project, ok, err := ui.Storage.Load(p)
+			// if err != nil {
+			// 	log.Printf("loading project %q: %v", p, err)
+			// }
 			if ok {
 				ui.Clear()
 				ui.Project = project
@@ -492,5 +500,38 @@ func (ui *UI) DeleteTicket(t kanban.Ticket) {
 		}.Layout(gtx, ui.Th, func(gtx C) D {
 			return ui.DeleteDialog.Layout(gtx, ui.Th)
 		})
+	}
+}
+
+// Projects is a list of Project entities with added behaviours.
+type Projects []kanban.Project
+
+// Find and return project by name.
+// Boolean indicates whether the project exists.
+func (plist Projects) Find(name string) (*kanban.Project, bool) {
+	for _, p := range plist {
+		p := p
+		if p.Name == name {
+			return &p, true
+		}
+	}
+	return nil, false
+}
+
+// Load entities from storage.
+func (ui *UI) Load() {
+	projects, err := ui.Storage.List()
+	if err != nil {
+		log.Printf("error: loading projects: %v", err)
+	}
+	ui.Projects = projects
+}
+
+// Save entities to storage.
+func (ui *UI) Save() {
+	for _, p := range ui.Projects {
+		if err := ui.Storage.Save(p); err != nil {
+			log.Printf("error: saving project %q: %v", p.Name, err)
+		}
 	}
 }

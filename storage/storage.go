@@ -9,7 +9,7 @@ import (
 // Storer persists Project entities.
 type Storer interface {
 	Create(p kanban.Project) error
-	Save(p *kanban.Project) error
-	Load(name string) (*kanban.Project, bool, error)
-	List() ([]*kanban.Project, error)
+	Save(p kanban.Project) error
+	Load(name string) (kanban.Project, bool, error)
+	List() ([]kanban.Project, error)
 }
