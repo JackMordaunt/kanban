@@ -96,6 +96,11 @@ func (ui *UI) Loop() error {
 		ops    op.Ops
 		events = ui.Window.Events()
 	)
+	projects, err := ui.Storage.List()
+	if err != nil {
+		return fmt.Errorf("loading projects: %v", err)
+	}
+	ui.Projects = projects
 	for event := range events {
 		switch event := (event).(type) {
 		case system.DestroyEvent:
@@ -155,8 +160,9 @@ func (ui *UI) Update(gtx C) {
 		}
 	}
 	if ui.ProjectForm.Submit.Clicked() {
+		name := ui.ProjectForm.Name.Text()
 		if err := ui.Storage.Create(kanban.Project{
-			Name: ui.ProjectForm.Name.Text(),
+			Name: name,
 			Stages: []kanban.Stage{
 				{Name: "Todo"},
 				{Name: "In Progress"},
@@ -165,21 +171,17 @@ func (ui *UI) Update(gtx C) {
 			},
 		}); err != nil {
 			log.Printf("creating new project: %v", err)
+		} else {
+			// Note: the Storer interface only updates the projects
+			// in the slice given to it. Therefore we add the Project
+			// to the slice here.  @cleanup
+			ui.Projects = append(ui.Projects, kanban.Project{Name: name})
 		}
 		ui.Clear()
 	}
 	if p, ok := ui.Rail.Selected(); ok {
-		// if ui.Project != nil {
-		// 	if err := ui.Storage.Save(ui.Project); err != nil {
-		// 		log.Printf("saving project: %v", err)
-		// 	}
-		// }
 		if ui.Project == nil || ui.Project.Name != p {
 			project, ok := ui.Projects.Find(p)
-			// project, ok, err := ui.Storage.Load(p)
-			// if err != nil {
-			// 	log.Printf("loading project %q: %v", p, err)
-			// }
 			if ok {
 				ui.Clear()
 				ui.Project = project
@@ -520,18 +522,14 @@ func (plist Projects) Find(name string) (*kanban.Project, bool) {
 
 // Load entities from storage.
 func (ui *UI) Load() {
-	projects, err := ui.Storage.List()
-	if err != nil {
+	if err := ui.Storage.Load(ui.Projects); err != nil {
 		log.Printf("error: loading projects: %v", err)
 	}
-	ui.Projects = projects
 }
 
 // Save entities to storage.
 func (ui *UI) Save() {
-	for _, p := range ui.Projects {
-		if err := ui.Storage.Save(p); err != nil {
-			log.Printf("error: saving project %q: %v", p.Name, err)
-		}
+	if err := ui.Storage.Save(ui.Projects...); err != nil {
+		log.Printf("error: saving projects: %v", err)
 	}
 }

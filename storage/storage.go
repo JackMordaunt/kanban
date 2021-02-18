@@ -8,8 +8,16 @@ import (
 
 // Storer persists Project entities.
 type Storer interface {
-	Create(p kanban.Project) error
-	Save(p kanban.Project) error
-	Load(name string) (kanban.Project, bool, error)
+	// Create a new Project.
+	Create(kanban.Project) error
+	// Save one or more existing Projects, updating the storage device.
+	Save(...kanban.Project) error
+	// Load updates the Projects using data from the storage device.
+	// Allows caller to allocate and control memory.
+	// Avoids copyig.
+	Load([]kanban.Project) error
+	// Lookup a Project by name.
+	Lookup(name string) (kanban.Project, bool, error)
+	// List all existing Projects.
 	List() ([]kanban.Project, error)
 }

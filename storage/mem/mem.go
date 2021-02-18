@@ -14,7 +14,6 @@ var _ storage.Storer = (*Storer)(nil)
 type Storer struct {
 	Data  map[string]kanban.Project
 	Order []string
-	Err   error
 }
 
 func New() *Storer {
@@ -32,16 +31,18 @@ func (s *Storer) Create(p kanban.Project) error {
 	return nil
 }
 
-func (s *Storer) Save(p kanban.Project) error {
-	if _, ok := s.Data[p.Name]; ok {
-		s.Data[p.Name] = p
-	} else {
-		return fmt.Errorf("project %q does not exist", p.Name)
+func (s *Storer) Save(projects ...kanban.Project) error {
+	for _, p := range projects {
+		if _, ok := s.Data[p.Name]; ok {
+			s.Data[p.Name] = p
+		} else {
+			return fmt.Errorf("project %q does not exist", p.Name)
+		}
 	}
 	return nil
 }
 
-func (s *Storer) Load(name string) (kanban.Project, bool, error) {
+func (s *Storer) Lookup(name string) (kanban.Project, bool, error) {
 	if p, ok := s.Data[name]; ok {
 		return p, ok, nil
 	}
@@ -55,4 +56,12 @@ func (s *Storer) List() (list []kanban.Project, err error) {
 		}
 	}
 	return list, nil
+}
+
+func (s *Storer) Load(projects []kanban.Project) error {
+	for ii := range projects {
+		p := s.Data[projects[ii].Name]
+		projects[ii] = p
+	}
+	return nil
 }

@@ -44,11 +44,17 @@ func (s *Storer) Create(p kanban.Project) error {
 	return s.DB.Save(&Schema{ID: p.Name, Project: p})
 }
 
-func (s *Storer) Save(p kanban.Project) error {
-	return s.DB.Update(&Schema{ID: p.Name, Project: p})
+func (s *Storer) Save(projects ...kanban.Project) error {
+	for _, p := range projects {
+		p := p
+		if err := s.DB.Update(&Schema{ID: p.Name, Project: p}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (s *Storer) Load(name string) (kanban.Project, bool, error) {
+func (s *Storer) Lookup(name string) (kanban.Project, bool, error) {
 	var schema Schema
 	if err := s.DB.One("ID", name, &schema); err != nil {
 		if errors.Is(err, storm.ErrNotFound) {
@@ -72,4 +78,21 @@ func (s *Storer) List() (list []kanban.Project, err error) {
 		list = append(list, p.Project)
 	}
 	return list, nil
+}
+
+func (s *Storer) Load(projects []kanban.Project) error {
+	for ii := range projects {
+		var (
+			name   = projects[ii].Name
+			schema = Schema{
+				ID:      name,
+				Project: projects[ii],
+			}
+		)
+		if err := s.DB.One("ID", name, &schema); err != nil {
+			return err
+		}
+		projects[ii] = schema.Project
+	}
+	return nil
 }
