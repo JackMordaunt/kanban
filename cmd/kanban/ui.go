@@ -22,6 +22,7 @@ import (
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/util"
 	"git.sr.ht/~jackmordaunt/kanban/icons"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
+	"github.com/google/uuid"
 )
 
 type (
@@ -220,7 +221,7 @@ func (ui *UI) Update(gtx C) {
 			ui.Project.RegressTicket(t.Ticket)
 		}
 		if t.EditButton.Clicked() {
-			ui.EditTicket(&t.Ticket)
+			ui.EditTicket(t.Ticket)
 		}
 		if t.DeleteButton.Clicked() {
 			ui.DeleteTicket(t.Ticket)
@@ -230,9 +231,16 @@ func (ui *UI) Update(gtx C) {
 		}
 	}
 	if ui.TicketForm.SubmitBtn.Clicked() {
-		// @todo handle create/update ambiguity.
-		_ = ui.TicketForm.Submit()
-		ui.Project.AssignTicket(ui.TicketForm.Stage, *ui.TicketForm.Ticket)
+		t := ui.TicketForm.Submit()
+		if t.ID == uuid.Nil {
+			if err := ui.Project.AssignTicket(ui.TicketForm.Stage, t); err != nil {
+				log.Printf("assigning ticket: %v", err)
+			}
+		} else {
+			if err := ui.Project.UpdateTicket(t); err != nil {
+				log.Printf("updating ticket: %v", err)
+			}
+		}
 		ui.Clear()
 	}
 	if ui.TicketForm.CancelBtn.Clicked() {
@@ -246,7 +254,7 @@ func (ui *UI) Update(gtx C) {
 		ui.Clear()
 	}
 	if ui.TicketDetails.Edit.Clicked() {
-		ui.EditTicket(&ui.TicketDetails.Ticket)
+		ui.EditTicket(ui.TicketDetails.Ticket)
 	}
 	if ui.TicketDetails.Cancel.Clicked() {
 		ui.Clear()
@@ -459,7 +467,7 @@ func (ui *UI) InspectTicket(t kanban.Ticket) {
 }
 
 // EditTicket opens the ticket form for editing ticket data.
-func (ui *UI) EditTicket(t *kanban.Ticket) {
+func (ui *UI) EditTicket(t kanban.Ticket) {
 	ui.TicketForm.Set(t)
 	ui.Modal = func(gtx C) D {
 		return control.Card{
@@ -472,7 +480,6 @@ func (ui *UI) EditTicket(t *kanban.Ticket) {
 
 // AddTicket opens the ticket form for creating ticket data.
 func (ui *UI) AddTicket(stage string) {
-	ui.TicketForm.Set(&kanban.Ticket{})
 	ui.Modal = func(gtx C) D {
 		return control.Card{
 			Title: "Add Ticket",

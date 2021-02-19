@@ -34,6 +34,8 @@ package kanban
 import (
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Project is a context for a given set of tickets.
@@ -61,8 +63,19 @@ func (p *Project) MoveStage(name string, dir Direction) bool {
 }
 
 // AssignTicket assigns a ticket to the given stage.
-func (p *Project) AssignTicket(stage string, ticket Ticket) {
-	p.Stages.Find(stage).Assign(ticket)
+func (p *Project) AssignTicket(stage string, ticket Ticket) error {
+	return p.Stages.Find(stage).Assign(ticket)
+}
+
+// Update an existing ticket.
+// It is an error to attempt to update a ticket that does not exist.
+func (p *Project) UpdateTicket(ticket Ticket) error {
+	for _, s := range p.Stages {
+		if s.Update(ticket) {
+			return nil
+		}
+	}
+	return fmt.Errorf("ticket does not exist: %v", ticket)
 }
 
 // ProgressTicket moves a ticket to the "next" stage.
@@ -70,7 +83,7 @@ func (p *Project) ProgressTicket(ticket Ticket) {
 	for ii, s := range p.Stages {
 		if s.Contains(ticket) {
 			if ii < len(p.Stages)-1 {
-				p.Stages[ii+1].Assign(p.Stages[ii].Take(ticket))
+				_ = p.Stages[ii+1].Assign(p.Stages[ii].Take(ticket))
 			}
 			break
 		}
@@ -82,7 +95,7 @@ func (p *Project) RegressTicket(ticket Ticket) {
 	for ii, s := range p.Stages {
 		if s.Contains(ticket) {
 			if ii > 0 {
-				p.Stages[ii-1].Assign(p.Stages[ii].Take(ticket))
+				_ = p.Stages[ii-1].Assign(p.Stages[ii].Take(ticket))
 			}
 			break
 		}
@@ -126,14 +139,16 @@ type Stage struct {
 	Tickets []Ticket
 }
 
-// Assign appends a ticket id to the stage.
-func (s *Stage) Assign(ticket Ticket) {
-	for _, t := range s.Tickets {
-		if t == ticket {
-			return
-		}
+// Assign appends a ticket to the stage with a unique ID.
+// Existing tickets will be duplicated, butwith different IDs.
+func (s *Stage) Assign(ticket Ticket) error {
+	id, err := uuid.NewUUID()
+	if err != nil {
+		return fmt.Errorf("generating ID: %v", err)
 	}
+	ticket.ID = id
 	s.Tickets = append(s.Tickets, ticket)
+	return nil
 }
 
 // UnAssign removes a ticket id from the stage.
@@ -199,8 +214,21 @@ func (s *Stage) Contains(ticket Ticket) bool {
 	return false
 }
 
+// Update a ticket, returning a bool to indicate success.
+// False means ticket does not exist and therefore nothing was updated.
+func (s *Stage) Update(ticket Ticket) bool {
+	for ii, t := range s.Tickets {
+		if t.ID == ticket.ID {
+			s.Tickets[ii] = ticket
+			return true
+		}
+	}
+	return false
+}
+
 // Ticket in a stage.
 type Ticket struct {
+	ID uuid.UUID
 	// Title of the ticket.
 	Title string
 	// Summary contains short and concise overview of the ticket.

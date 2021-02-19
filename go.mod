@@ -6,6 +6,7 @@ require (
 	gioui.org v0.0.0-20210210205757-7286b075e2fb
 	gioui.org/x v0.0.0-20210120222453-b55819bc712b
 	github.com/asdine/storm/v3 v3.2.1
+	github.com/google/uuid v1.2.0
 	github.com/spf13/pflag v1.0.5
 	go.etcd.io/bbolt v1.3.5 // indirect
 	golang.org/x/exp v0.0.0-20210212053707-62dc52270d37

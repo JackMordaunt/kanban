@@ -21,7 +21,7 @@ import (
 //
 // @Todo use form pattern from avisha.
 type TicketForm struct {
-	*kanban.Ticket
+	kanban.Ticket
 	Stage     string
 	Title     component.TextField
 	Summary   component.TextField
@@ -30,21 +30,24 @@ type TicketForm struct {
 	CancelBtn widget.Clickable
 }
 
-func (f *TicketForm) Set(t *kanban.Ticket) {
+func (f *TicketForm) Set(t kanban.Ticket) {
 	f.Ticket = t
 	f.Title.SetText(t.Title)
 	f.Summary.SetText(t.Summary)
 	f.Details.SetText(t.Details)
 }
 
-// Submit validates inputs and writes to the ticket.
-func (f TicketForm) Submit() error {
-	*f.Ticket = kanban.Ticket{
+// Submit uses form data to create a Ticket.
+func (f TicketForm) Submit() kanban.Ticket {
+	defer func() {
+		f.Ticket = kanban.Ticket{}
+	}()
+	return kanban.Ticket{
+		ID:      f.ID,
 		Title:   f.Title.Text(),
 		Summary: f.Summary.Text(),
 		Details: f.Details.Text(),
 	}
-	return nil
 }
 
 func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
