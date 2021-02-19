@@ -160,22 +160,22 @@ func (ui *UI) Update(gtx C) {
 		}
 	}
 	if ui.ProjectForm.Submit.Clicked() {
-		name := ui.ProjectForm.Name.Text()
-		if err := ui.Storage.Create(kanban.Project{
-			Name: name,
+		p := kanban.Project{
+			Name: ui.ProjectForm.Name.Text(),
 			Stages: []kanban.Stage{
 				{Name: "Todo"},
 				{Name: "In Progress"},
 				{Name: "Testing"},
 				{Name: "Done"},
 			},
-		}); err != nil {
+		}
+		if err := ui.Storage.Create(p); err != nil {
 			log.Printf("creating new project: %v", err)
 		} else {
 			// Note: the Storer interface only updates the projects
 			// in the slice given to it. Therefore we add the Project
 			// to the slice here.  @cleanup
-			ui.Projects = append(ui.Projects, kanban.Project{Name: name})
+			ui.Projects = append(ui.Projects, p)
 		}
 		ui.Clear()
 	}
