@@ -14,7 +14,7 @@ type Storer interface {
 	Save(...kanban.Project) error
 	// Load updates the Projects using data from the storage device.
 	// Allows caller to allocate and control memory.
-	// Avoids copyig.
+	// Avoids copying.
 	Load([]kanban.Project) error
 	// Lookup a Project by name.
 	Lookup(name string) (kanban.Project, bool, error)
