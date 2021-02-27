@@ -33,7 +33,8 @@ type TicketForm struct {
 	CancelBtn widget.Clickable
 }
 
-func (f *TicketForm) Set(t kanban.Ticket) {
+// Edit the provided ticket.
+func (f *TicketForm) Edit(t kanban.Ticket) {
 	f.Ticket = t
 	f.Title.SetText(t.Title)
 	f.Summary.SetText(t.Summary)
@@ -53,12 +54,12 @@ func (f TicketForm) Submit() kanban.Ticket {
 	}
 }
 
-func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
-	form.Stage = stage
-	form.Title.SingleLine = true
+func (f *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
+	f.Stage = stage
+	f.Title.SingleLine = true
 	return control.Card{
 		Title: func() string {
-			if form.Ticket.ID == uuid.Nil {
+			if f.Ticket.ID == uuid.Nil {
 				return "Add Ticket"
 			}
 			return "Edit Ticket"
@@ -69,25 +70,25 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 			}.Layout(
 				gtx,
 				layout.Rigid(func(gtx C) D {
-					return form.Title.Layout(gtx, th, "Title")
+					return f.Title.Layout(gtx, th, "Title")
 				}),
 				layout.Rigid(func(gtx C) D {
-					return form.Summary.Layout(gtx, th, "Summary")
+					return f.Summary.Layout(gtx, th, "Summary")
 				}),
 				layout.Rigid(func(gtx C) D {
-					return form.Details.Layout(gtx, th, "Details")
+					return f.Details.Layout(gtx, th, "Details")
 				}),
 			)
 		},
 		Actions: []control.Action{
 			{
-				Clickable: &form.SubmitBtn,
+				Clickable: &f.SubmitBtn,
 				Label:     "Submit",
 				Fg:        th.ContrastFg,
 				Bg:        th.ContrastBg,
 			},
 			{
-				Clickable: &form.CancelBtn,
+				Clickable: &f.CancelBtn,
 				Label:     "Cancel",
 				Fg:        th.Fg,
 				Bg:        th.Bg,
@@ -103,7 +104,7 @@ type ProjectForm struct {
 	Cancel widget.Clickable
 }
 
-func (form *ProjectForm) Layout(gtx C, th *material.Theme) D {
+func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
 	return control.Card{
 		Title: "Create a new Project",
 		Body: func(gtx C) D {
@@ -112,19 +113,19 @@ func (form *ProjectForm) Layout(gtx C, th *material.Theme) D {
 			}.Layout(
 				gtx,
 				layout.Rigid(func(gtx C) D {
-					return form.Name.Layout(gtx, th, "Project Name")
+					return f.Name.Layout(gtx, th, "Project Name")
 				}),
 			)
 		},
 		Actions: []control.Action{
 			{
-				Clickable: &form.Submit,
+				Clickable: &f.Submit,
 				Label:     "Submit",
 				Fg:        th.ContrastFg,
 				Bg:        th.ContrastBg,
 			},
 			{
-				Clickable: &form.Cancel,
+				Clickable: &f.Cancel,
 				Label:     "Cancel",
 				Fg:        th.Fg,
 				Bg:        th.Bg,
