@@ -180,13 +180,17 @@ func (ui *UI) Update(gtx C) {
 				{Name: "Done"},
 			},
 		}
+		// @cleanup
+		// Could we enforce this relationship with the api?
+		// Perhaps pass in the projects slice and have it append to it.
 		if err := ui.Storage.Create(p); err != nil {
 			log.Printf("creating new project: %v", err)
 		} else {
-			// Note: the Storer interface only updates the projects
-			// in the slice given to it. Therefore we add the Project
-			// to the slice here.  @cleanup
-			ui.Projects = append(ui.Projects, p)
+			if projects, err := ui.Storage.List(); err == nil {
+				ui.Projects = projects
+			} else {
+				log.Printf("listing projects: %v", err)
+			}
 		}
 		ui.Clear()
 	}
