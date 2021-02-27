@@ -491,6 +491,7 @@ func (ui *UI) AddTicket(stage string) {
 
 // CreatTicket opens the project creation dialog.
 func (ui *UI) CreateProject() {
+	ui.ProjectForm.Name.Focus()
 	ui.Modal = func(gtx C) D {
 		return control.Card{
 			Title: "Create a new Project",
