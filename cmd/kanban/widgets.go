@@ -81,15 +81,6 @@ func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						btn := material.Button(th, &form.CancelBtn, "Cancel")
-						btn.Color = th.Bg
-						btn.Background = color.NRGBA{}
-						return btn.Layout(gtx)
-					}),
-					layout.Rigid(func(gtx C) D {
-						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
-					}),
-					layout.Rigid(func(gtx C) D {
-						btn := material.Button(th, &form.CancelBtn, "Cancel")
 						btn.Color = th.Fg
 						btn.Background = color.NRGBA{}
 						return btn.Layout(gtx)
@@ -186,7 +177,7 @@ func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						btn := material.Button(th, &d.Cancel, "Cancel")
-						btn.Color = th.Bg
+						btn.Color = th.Fg
 						btn.Background = color.NRGBA{}
 						return btn.Layout(gtx)
 					}),
