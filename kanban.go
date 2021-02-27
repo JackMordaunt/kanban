@@ -122,11 +122,11 @@ func (p *Project) StageForTicket(ticket Ticket) *Stage {
 	return &Stage{}
 }
 
-// FinalizeTicket renders the ticket "complete" ad moves it into an archive.
+// FinalizeTicket renders the ticket "complete" and moves it into an archive.
 func (p *Project) FinalizeTicket(t Ticket) {
-	for _, s := range p.Stages {
+	for ii, s := range p.Stages {
 		if s.Contains(t) {
-			s.UnAssign(t)
+			p.Stages[ii].UnAssign(t)
 			p.Finalized = append(p.Finalized, t)
 			break
 		}
@@ -151,11 +151,15 @@ func (s *Stage) Assign(ticket Ticket) error {
 	return nil
 }
 
-// UnAssign removes a ticket id from the stage.
+// UnAssign removes a ticket from the stage.
 func (s *Stage) UnAssign(ticket Ticket) {
 	for ii, t := range s.Tickets {
 		if t == ticket {
-			s.Tickets = append(s.Tickets[:ii], s.Tickets[ii+1:]...)
+			if len(s.Tickets) == 1 {
+				s.Tickets = []Ticket{}
+			} else {
+				s.Tickets = append(s.Tickets[:ii], s.Tickets[ii+1:]...)
+			}
 		}
 	}
 }
