@@ -479,6 +479,7 @@ func (ui *UI) EditTicket(t kanban.Ticket) {
 
 // AddTicket opens the ticket form for creating ticket data.
 func (ui *UI) AddTicket(stage string) {
+	ui.TicketForm.Title.Focus()
 	ui.Modal = func(gtx C) D {
 		return control.Card{
 			Title: "Add Ticket",
