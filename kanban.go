@@ -140,14 +140,16 @@ type Stage struct {
 }
 
 // Assign appends a ticket to the stage with a unique ID.
-// Existing tickets will be duplicated, butwith different IDs.
+// Existing tickets will be duplicated, but with different IDs.
 func (s *Stage) Assign(ticket Ticket) error {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		return fmt.Errorf("generating ID: %v", err)
+	if ticket.ID == uuid.Nil {
+		id, err := uuid.NewUUID()
+		if err != nil {
+			return fmt.Errorf("generating ID: %v", err)
+		}
+		ticket.ID = id
+		ticket.Created = time.Now()
 	}
-	ticket.ID = id
-	ticket.Created = time.Now()
 	s.Tickets = append(s.Tickets, ticket)
 	return nil
 }
