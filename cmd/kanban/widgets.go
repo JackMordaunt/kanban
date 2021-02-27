@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"strings"
 	"time"
 
 	"gioui.org/layout"
@@ -44,7 +45,7 @@ func (f TicketForm) Submit() kanban.Ticket {
 	}()
 	return kanban.Ticket{
 		ID:      f.ID,
-		Title:   f.Title.Text(),
+		Title:   strings.TrimSpace(f.Title.Text()),
 		Summary: f.Summary.Text(),
 		Details: f.Details.Text(),
 	}
@@ -52,6 +53,7 @@ func (f TicketForm) Submit() kanban.Ticket {
 
 func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 	form.Stage = stage
+	form.Title.SingleLine = true
 	return layout.Flex{
 		Axis: layout.Vertical,
 	}.Layout(

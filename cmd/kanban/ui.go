@@ -458,7 +458,7 @@ func (ui *UI) InspectTicket(t kanban.Ticket) {
 	ui.TicketDetails.Ticket = t
 	ui.Modal = func(gtx C) D {
 		return control.Card{
-			Title: fmt.Sprintf("%q", t.Title),
+			Title: t.Title,
 		}.Layout(gtx, ui.Th, func(gtx C) D {
 			return ui.TicketDetails.Layout(gtx, ui.Th)
 		})
