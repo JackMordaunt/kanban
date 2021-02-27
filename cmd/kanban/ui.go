@@ -60,6 +60,10 @@ type UI struct {
 	// nil value implies no active project.
 	Project *kanban.Project
 
+	// previous is used to detect when the active project has change in order to
+	// run init code like allocating panels.
+	previous *kanban.Project
+
 	// Panels render the active Project stages.
 	// Shares the same lifetime as the active project.
 	Panels []*control.Panel
@@ -102,6 +106,9 @@ func (ui *UI) Loop() error {
 		return fmt.Errorf("loading projects: %v", err)
 	}
 	ui.Projects = projects
+	if len(ui.Projects) > 0 {
+		ui.Project = &ui.Projects[0]
+	}
 	for event := range events {
 		switch event := (event).(type) {
 		case system.DestroyEvent:
@@ -132,6 +139,9 @@ func (ui *UI) Shutdown() error {
 // and others are for the devs.
 // Currently errors are just printed; not great for windowed applications.
 func (ui *UI) Update(gtx C) {
+	if ui.Project != ui.previous {
+		ui.sync()
+	}
 	for _, event := range gtx.Events(ui) {
 		if k, ok := event.(key.Event); ok {
 			switch k.Name {
@@ -184,18 +194,7 @@ func (ui *UI) Update(gtx C) {
 		if ui.Project == nil || ui.Project.Name != p {
 			project, ok := ui.Projects.Find(p)
 			if ok {
-				ui.Clear()
 				ui.Project = project
-				ui.Panels = func() (panels []*control.Panel) {
-					for _, s := range project.Stages {
-						panels = append(panels, &control.Panel{
-							Label:     s.Name,
-							Color:     color.NRGBA{R: 100, B: 100, G: 200, A: 255},
-							Thickness: unit.Dp(50),
-						})
-					}
-					return panels
-				}()
 			}
 		}
 	}
@@ -539,4 +538,31 @@ func (ui *UI) Save() {
 	if err := ui.Storage.Save(ui.Projects...); err != nil {
 		log.Printf("error: saving projects: %v", err)
 	}
+}
+
+// sync any project dependent state when a project has changed.
+func (ui *UI) sync() {
+	ui.Clear()
+	ui.previous = ui.Project
+	// Allocate one panel per stage.
+	ui.Panels = func() (panels []*control.Panel) {
+		for ii, s := range ui.Project.Stages {
+			panels = append(panels, &control.Panel{
+				Label: s.Name,
+				// First 4 panel colors are hardcoded.
+				// Where to store UI state? Ideally not alongside the stage, since it's
+				// purely a UI concern.
+				// If we have more than four stages, just wrap the colors.
+				// @improve
+				Color: []color.NRGBA{
+					{R: 100, B: 100, G: 200, A: 255},
+					{R: 100, B: 200, G: 100, A: 255},
+					{R: 200, B: 100, G: 100, A: 255},
+					{R: 200, B: 200, G: 100, A: 255},
+				}[ii%4],
+				Thickness: unit.Dp(50),
+			})
+		}
+		return panels
+	}()
 }
