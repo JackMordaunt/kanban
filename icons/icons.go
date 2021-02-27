@@ -5,27 +5,18 @@ import (
 	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
-var BackIcon *widget.Icon = func() *widget.Icon {
-	icon, _ := widget.NewIcon(icons.NavigationArrowBack)
-	return icon
-}()
+var (
+	BackIcon      *widget.Icon = must(widget.NewIcon(icons.NavigationArrowBack))
+	ForwardIcon   *widget.Icon = must(widget.NewIcon(icons.NavigationArrowForward))
+	ContentEdit   *widget.Icon = must(widget.NewIcon(icons.ContentCreate))
+	ContentDelete *widget.Icon = must(widget.NewIcon(icons.ContentDeleteSweep))
+	ContentAdd    *widget.Icon = must(widget.NewIcon(icons.ContentAdd))
+	Configuration *widget.Icon = must(widget.NewIcon(icons.ActionSettings))
+)
 
-var ForwardIcon *widget.Icon = func() *widget.Icon {
-	icon, _ := widget.NewIcon(icons.NavigationArrowForward)
+func must(icon *widget.Icon, err error) *widget.Icon {
+	if err != nil {
+		panic(err)
+	}
 	return icon
-}()
-
-var ContentEdit *widget.Icon = func() *widget.Icon {
-	icon, _ := widget.NewIcon(icons.ContentCreate)
-	return icon
-}()
-
-var ContentDelete *widget.Icon = func() *widget.Icon {
-	icon, _ := widget.NewIcon(icons.ContentDeleteSweep)
-	return icon
-}()
-
-var ContentAdd *widget.Icon = func() *widget.Icon {
-	icon, _ := widget.NewIcon(icons.ContentAdd)
-	return icon
-}()
+}
