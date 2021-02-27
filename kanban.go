@@ -147,6 +147,7 @@ func (s *Stage) Assign(ticket Ticket) error {
 		return fmt.Errorf("generating ID: %v", err)
 	}
 	ticket.ID = id
+	ticket.Created = time.Now()
 	s.Tickets = append(s.Tickets, ticket)
 	return nil
 }
