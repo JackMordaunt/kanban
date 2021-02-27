@@ -457,11 +457,7 @@ func (ui *UI) Clear() {
 func (ui *UI) InspectTicket(t kanban.Ticket) {
 	ui.TicketDetails.Ticket = t
 	ui.Modal = func(gtx C) D {
-		return control.Card{
-			Title: t.Title,
-		}.Layout(gtx, ui.Th, func(gtx C) D {
-			return ui.TicketDetails.Layout(gtx, ui.Th)
-		})
+		return ui.TicketDetails.Layout(gtx, ui.Th)
 	}
 }
 
@@ -469,11 +465,7 @@ func (ui *UI) InspectTicket(t kanban.Ticket) {
 func (ui *UI) EditTicket(t kanban.Ticket) {
 	ui.TicketForm.Set(t)
 	ui.Modal = func(gtx C) D {
-		return control.Card{
-			Title: "Edit Ticket",
-		}.Layout(gtx, ui.Th, func(gtx C) D {
-			return ui.TicketForm.Layout(gtx, ui.Th, "")
-		})
+		return ui.TicketForm.Layout(gtx, ui.Th, "")
 	}
 }
 
@@ -481,11 +473,7 @@ func (ui *UI) EditTicket(t kanban.Ticket) {
 func (ui *UI) AddTicket(stage string) {
 	ui.TicketForm.Title.Focus()
 	ui.Modal = func(gtx C) D {
-		return control.Card{
-			Title: "Add Ticket",
-		}.Layout(gtx, ui.Th, func(gtx C) D {
-			return ui.TicketForm.Layout(gtx, ui.Th, stage)
-		})
+		return ui.TicketForm.Layout(gtx, ui.Th, stage)
 	}
 }
 
@@ -493,11 +481,7 @@ func (ui *UI) AddTicket(stage string) {
 func (ui *UI) CreateProject() {
 	ui.ProjectForm.Name.Focus()
 	ui.Modal = func(gtx C) D {
-		return control.Card{
-			Title: "Create a new Project",
-		}.Layout(gtx, ui.Th, func(gtx C) D {
-			return ui.ProjectForm.Layout(gtx, ui.Th)
-		})
+		return ui.ProjectForm.Layout(gtx, ui.Th)
 	}
 }
 
@@ -505,11 +489,7 @@ func (ui *UI) CreateProject() {
 func (ui *UI) DeleteTicket(t kanban.Ticket) {
 	ui.DeleteDialog.Ticket = t
 	ui.Modal = func(gtx C) D {
-		return control.Card{
-			Title: "Delete Ticket",
-		}.Layout(gtx, ui.Th, func(gtx C) D {
-			return ui.DeleteDialog.Layout(gtx, ui.Th)
-		})
+		return ui.DeleteDialog.Layout(gtx, ui.Th)
 	}
 }
 

@@ -14,8 +14,10 @@ import (
 	"gioui.org/widget/material"
 	"gioui.org/x/component"
 	"git.sr.ht/~jackmordaunt/kanban"
+	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/control"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/util"
 	"git.sr.ht/~jackmordaunt/kanban/icons"
+	"github.com/google/uuid"
 )
 
 // TicketForm renders the form for ticket information.
@@ -54,47 +56,44 @@ func (f TicketForm) Submit() kanban.Ticket {
 func (form *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 	form.Stage = stage
 	form.Title.SingleLine = true
-	return layout.Flex{
-		Axis: layout.Vertical,
-	}.Layout(
-		gtx,
-		layout.Rigid(func(gtx C) D {
-			return form.Title.Layout(gtx, th, "Title")
-		}),
-		layout.Rigid(func(gtx C) D {
-			return form.Summary.Layout(gtx, th, "Summary")
-		}),
-		layout.Rigid(func(gtx C) D {
-			return form.Details.Layout(gtx, th, "Details")
-		}),
-		layout.Rigid(func(gtx C) D {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{
-				Top: unit.Dp(10),
-			}.Layout(gtx, func(gtx C) D {
-				return layout.Flex{
-					Axis: layout.Horizontal,
-				}.Layout(
-					gtx,
-					layout.Flexed(1, func(gtx C) D {
-						return D{Size: gtx.Constraints.Min}
-					}),
-					layout.Rigid(func(gtx C) D {
-						btn := material.Button(th, &form.CancelBtn, "Cancel")
-						btn.Color = th.Fg
-						btn.Background = color.NRGBA{}
-						return btn.Layout(gtx)
-					}),
-					layout.Rigid(func(gtx C) D {
-						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
-					}),
-					layout.Rigid(func(gtx C) D {
-						return material.Button(th, &form.SubmitBtn, "Submit").Layout(gtx)
-					}),
-				)
-			})
-		}),
-	)
+	return control.Card{
+		Title: func() string {
+			if form.Ticket.ID == uuid.Nil {
+				return "Add Ticket"
+			}
+			return "Edit Ticket"
+		}(),
+		Body: func(gtx C) D {
+			return layout.Flex{
+				Axis: layout.Vertical,
+			}.Layout(
+				gtx,
+				layout.Rigid(func(gtx C) D {
+					return form.Title.Layout(gtx, th, "Title")
+				}),
+				layout.Rigid(func(gtx C) D {
+					return form.Summary.Layout(gtx, th, "Summary")
+				}),
+				layout.Rigid(func(gtx C) D {
+					return form.Details.Layout(gtx, th, "Details")
+				}),
+			)
+		},
+		Actions: []control.Action{
+			{
+				Clickable: &form.SubmitBtn,
+				Label:     "Submit",
+				Fg:        th.ContrastFg,
+				Bg:        th.ContrastBg,
+			},
+			{
+				Clickable: &form.CancelBtn,
+				Label:     "Cancel",
+				Fg:        th.Fg,
+				Bg:        th.Bg,
+			},
+		},
+	}.Layout(gtx, th)
 }
 
 // ProjectForm renders a form for manipulating projects.
@@ -105,41 +104,33 @@ type ProjectForm struct {
 }
 
 func (form *ProjectForm) Layout(gtx C, th *material.Theme) D {
-	return layout.Flex{
-		Axis: layout.Vertical,
-	}.Layout(
-		gtx,
-		layout.Rigid(func(gtx C) D {
-			return form.Name.Layout(gtx, th, "Project Name")
-		}),
-		layout.Rigid(func(gtx C) D {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{
-				Top: unit.Dp(10),
-			}.Layout(gtx, func(gtx C) D {
-				return layout.Flex{
-					Axis: layout.Horizontal,
-				}.Layout(
-					gtx,
-					layout.Flexed(1, func(gtx C) D {
-						return D{Size: gtx.Constraints.Min}
-					}),
-					layout.Rigid(func(gtx C) D {
-						btn := material.Button(th, &form.Cancel, "Cancel")
-						btn.Color = th.Fg
-						btn.Background = color.NRGBA{}
-						return btn.Layout(gtx)
-					}),
-					layout.Rigid(func(gtx C) D {
-						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
-					}),
-					layout.Rigid(func(gtx C) D {
-						return material.Button(th, &form.Submit, "Submit").Layout(gtx)
-					}),
-				)
-			})
-		}),
-	)
+	return control.Card{
+		Title: "Create a new Project",
+		Body: func(gtx C) D {
+			return layout.Flex{
+				Axis: layout.Vertical,
+			}.Layout(
+				gtx,
+				layout.Rigid(func(gtx C) D {
+					return form.Name.Layout(gtx, th, "Project Name")
+				}),
+			)
+		},
+		Actions: []control.Action{
+			{
+				Clickable: &form.Submit,
+				Label:     "Submit",
+				Fg:        th.ContrastFg,
+				Bg:        th.ContrastBg,
+			},
+			{
+				Clickable: &form.Cancel,
+				Label:     "Cancel",
+				Fg:        th.Fg,
+				Bg:        th.Bg,
+			},
+		},
+	}.Layout(gtx, th)
 }
 
 // DeleteDialog prompts the user with an option to delete a ticket.
@@ -150,49 +141,37 @@ type DeleteDialog struct {
 }
 
 func (d *DeleteDialog) Layout(gtx C, th *material.Theme) D {
-	return layout.Flex{
-		Axis:      layout.Vertical,
-		Alignment: layout.Middle,
-	}.Layout(
-		gtx,
-		layout.Rigid(func(gtx C) D {
-			return layout.Center.Layout(gtx, func(gtx C) D {
-				return material.Body1(
-					th,
-					fmt.Sprintf("Are you sure you want to delete ticket %q?", d.Title),
-				).Layout(gtx)
-			})
-		}),
-		layout.Rigid(func(gtx C) D {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{
-				Top: unit.Dp(10),
-			}.Layout(gtx, func(gtx C) D {
-				return layout.Flex{
-					Axis: layout.Horizontal,
-				}.Layout(
-					gtx,
-					layout.Flexed(1, func(gtx C) D {
-						return D{Size: gtx.Constraints.Min}
-					}),
-					layout.Rigid(func(gtx C) D {
-						btn := material.Button(th, &d.Cancel, "Cancel")
-						btn.Color = th.Fg
-						btn.Background = color.NRGBA{}
-						return btn.Layout(gtx)
-					}),
-					layout.Rigid(func(gtx C) D {
-						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
-					}),
-					layout.Rigid(func(gtx C) D {
-						btn := material.Button(th, &d.Ok, "Delete")
-						btn.Background = color.NRGBA{R: 200, A: 255}
-						return btn.Layout(gtx)
-					}),
-				)
-			})
-		}),
-	)
+	return control.Card{
+		Title: "Are you sure?",
+		Body: func(gtx C) D {
+			return layout.Flex{
+				Axis:      layout.Vertical,
+				Alignment: layout.Middle,
+			}.Layout(
+				gtx,
+				layout.Rigid(func(gtx C) D {
+					return material.Body1(
+						th,
+						fmt.Sprintf("Delete ticket %q?", d.Title),
+					).Layout(gtx)
+				}),
+			)
+		},
+		Actions: []control.Action{
+			{
+				Clickable: &d.Ok,
+				Label:     "Delete",
+				Fg:        th.ContrastFg,
+				Bg:        color.NRGBA{R: 200, A: 255},
+			},
+			{
+				Clickable: &d.Cancel,
+				Label:     "Cancel",
+				Fg:        th.Fg,
+				Bg:        th.Bg,
+			},
+		},
+	}.Layout(gtx, th)
 }
 
 // Ticket renders a ticket control.
@@ -270,8 +249,6 @@ func (t *Ticket) Layout(gtx C, th *material.Theme, focused bool) D {
 	})
 }
 
-// @todo: de-emphasize details content.
-// @todo: summarize based on card size rather than content length.
 func (t *Ticket) content(gtx C, th *material.Theme) D {
 	macro := op.Record(gtx.Ops)
 	dims := layout.Inset{
@@ -289,12 +266,9 @@ func (t *Ticket) content(gtx C, th *material.Theme) D {
 			}),
 			layout.Rigid(func(gtx C) D {
 				return layout.Inset{Top: unit.Dp(10)}.Layout(gtx, func(gtx C) D {
-					return material.Body1(th, t.Summary).Layout(gtx)
-				})
-			}),
-			layout.Rigid(func(gtx C) D {
-				return layout.Inset{Top: unit.Dp(10)}.Layout(gtx, func(gtx C) D {
-					return material.Body1(th, summarize(t.Details, 0)).Layout(gtx)
+					l := material.Body1(th, t.Summary)
+					l.Color = component.WithAlpha(l.Color, 200)
+					return l.Layout(gtx)
 				})
 			}),
 		)
@@ -429,54 +403,25 @@ type TicketDetails struct {
 }
 
 func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
-	return layout.Flex{
-		Axis: layout.Vertical,
-	}.Layout(
-		gtx,
-		layout.Rigid(func(gtx C) D {
-			return material.Body1(th, t.Summary).Layout(gtx)
-		}),
-		layout.Rigid(func(gtx C) D {
+	return control.Card{
+		Title:    t.Title,
+		Subtitle: t.Summary,
+		Body: func(gtx C) D {
 			return material.Body1(th, t.Details).Layout(gtx)
-		}),
-		layout.Rigid(func(gtx C) D {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{
-				Top: unit.Dp(10),
-			}.Layout(gtx, func(gtx C) D {
-				return layout.Flex{
-					Axis: layout.Horizontal,
-				}.Layout(
-					gtx,
-					layout.Flexed(1, func(gtx C) D {
-						return D{Size: gtx.Constraints.Min}
-					}),
-					layout.Rigid(func(gtx C) D {
-						btn := material.Button(th, &t.Cancel, "Cancel")
-						btn.Color = th.Fg
-						btn.Background = color.NRGBA{}
-						return btn.Layout(gtx)
-					}),
-					layout.Rigid(func(gtx C) D {
-						return D{Size: image.Point{X: gtx.Px(unit.Dp(10))}}
-					}),
-					layout.Rigid(func(gtx C) D {
-						return material.Button(th, &t.Edit, "Edit").Layout(gtx)
-					}),
-				)
-			})
-		}),
-	)
-}
-
-// summarize truncates string s after n amount of characters, and appends an
-// elipsis to indicate missing content.
-func summarize(s string, n int) string {
-	if n == 0 {
-		n = 70
-	}
-	if len(s) < n {
-		return s
-	}
-	return strings.TrimSpace(s[:n]) + string('\u2026')
+		},
+		Actions: []control.Action{
+			{
+				Clickable: &t.Edit,
+				Label:     "Edit",
+				Fg:        th.ContrastFg,
+				Bg:        th.ContrastBg,
+			},
+			{
+				Clickable: &t.Cancel,
+				Label:     "Cancel",
+				Fg:        th.Fg,
+				Bg:        th.Bg,
+			},
+		},
+	}.Layout(gtx, th)
 }
