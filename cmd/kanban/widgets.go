@@ -209,9 +209,9 @@ type Ticket struct {
 // Layout the ticket card.
 //
 // The layouting here was actually quite tricky because `layout.List` simulates
-// an infinite Y axis. That means you can just specify a max Y constraint. This
-// makes expanding stacked content vertically impossible with a naive use of
-// `layout.Stack`.
+// an infinite Y axis. That means you can't just specify a max Y constraint.
+// This makes expanding stacked content vertically impossible with a naive use
+// of `layout.Stack`.
 //
 // To get around this I used a macro and manually stacked things sized exactly
 // to the content, rather than the maximum Y.
@@ -270,6 +270,8 @@ func (t *Ticket) Layout(gtx C, th *material.Theme, focused bool) D {
 	})
 }
 
+// @todo: de-emphasize details content.
+// @todo: summarize based on card size rather than content length.
 func (t *Ticket) content(gtx C, th *material.Theme) D {
 	macro := op.Record(gtx.Ops)
 	dims := layout.Inset{
@@ -288,6 +290,11 @@ func (t *Ticket) content(gtx C, th *material.Theme) D {
 			layout.Rigid(func(gtx C) D {
 				return layout.Inset{Top: unit.Dp(10)}.Layout(gtx, func(gtx C) D {
 					return material.Body1(th, t.Summary).Layout(gtx)
+				})
+			}),
+			layout.Rigid(func(gtx C) D {
+				return layout.Inset{Top: unit.Dp(10)}.Layout(gtx, func(gtx C) D {
+					return material.Body1(th, summarize(t.Details, 0)).Layout(gtx)
 				})
 			}),
 		)
@@ -460,4 +467,16 @@ func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
 			})
 		}),
 	)
+}
+
+// summarize truncates string s after n amount of characters, and appends an
+// elipsis to indicate missing content.
+func summarize(s string, n int) string {
+	if n == 0 {
+		n = 70
+	}
+	if len(s) < n {
+		return s
+	}
+	return strings.TrimSpace(s[:n]) + string('\u2026')
 }
