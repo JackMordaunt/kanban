@@ -135,13 +135,13 @@ func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
 		},
 		Actions: []control.Action{
 			{
-				Clickable: &f.Submit,
+				Clickable: &f.SubmitBtn,
 				Label:     "Submit",
 				Fg:        th.ContrastFg,
 				Bg:        th.ContrastBg,
 			},
 			{
-				Clickable: &f.Cancel,
+				Clickable: &f.CancelBtn,
 				Label:     "Cancel",
 				Fg:        th.Fg,
 				Bg:        th.Bg,
