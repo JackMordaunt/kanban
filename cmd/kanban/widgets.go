@@ -99,9 +99,25 @@ func (f *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 
 // ProjectForm renders a form for manipulating projects.
 type ProjectForm struct {
-	Name   component.TextField
-	Submit widget.Clickable
-	Cancel widget.Clickable
+	kanban.Project
+	Name      component.TextField
+	SubmitBtn widget.Clickable
+	CancelBtn widget.Clickable
+}
+
+// Edit the provided project.
+func (f *ProjectForm) Edit(p kanban.Project) {
+	f.Project = p
+	f.Name.SetText(p.Name)
+}
+
+func (f *ProjectForm) Submit() kanban.Project {
+	defer func() {
+		f.Project = kanban.Project{}
+	}()
+	return kanban.Project{
+		Name: f.Name.Text(),
+	}
 }
 
 func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {

@@ -40,10 +40,12 @@ import (
 
 // Project is a context for a given set of tickets.
 type Project struct {
-	// Name of project, must be unique.
+	ID uuid.UUID
+	// Name of the project.
 	Name string
-	// Stages owned by this project.
-	Stages    Stages
+	// Stages is the list of stages owned by the project.
+	Stages Stages
+	// Finalized is a psuedo stage that contains all finalized tickets.
 	Finalized []Ticket
 }
 

@@ -92,7 +92,8 @@ type UI struct {
 	// 	Stage kanban.ID
 	// }
 
-	CreateProjectButton widget.Clickable
+	CreateProjectBtn widget.Clickable
+	EditProjectBtn   widget.Clickable
 }
 
 // Loop runs the event loop until terminated.
@@ -170,8 +171,12 @@ func (ui *UI) Update(gtx C) {
 			}
 		}
 	}
-	if ui.ProjectForm.Submit.Clicked() {
-		p := kanban.Project{
+	if ui.ProjectForm.SubmitBtn.Clicked() {
+		// @cleanup
+		// Could we enforce this relationship with the api?
+		// Perhaps pass in the projects slice and have it append to it.
+		if err := ui.Storage.Create(kanban.Project{
+			ID:   uuid.New(),
 			Name: ui.ProjectForm.Name.Text(),
 			Stages: []kanban.Stage{
 				{Name: "Todo"},
@@ -179,11 +184,7 @@ func (ui *UI) Update(gtx C) {
 				{Name: "Testing"},
 				{Name: "Done"},
 			},
-		}
-		// @cleanup
-		// Could we enforce this relationship with the api?
-		// Perhaps pass in the projects slice and have it append to it.
-		if err := ui.Storage.Create(p); err != nil {
+		}); err != nil {
 			log.Printf("creating new project: %v", err)
 		} else {
 			if projects, err := ui.Storage.List(); err == nil {
@@ -202,7 +203,7 @@ func (ui *UI) Update(gtx C) {
 			}
 		}
 	}
-	if ui.ProjectForm.Cancel.Clicked() {
+	if ui.ProjectForm.CancelBtn.Clicked() {
 		ui.Clear()
 	}
 	for ii := range ui.Panels {
@@ -262,8 +263,11 @@ func (ui *UI) Update(gtx C) {
 	if ui.TicketDetails.Cancel.Clicked() {
 		ui.Clear()
 	}
-	if ui.CreateProjectButton.Clicked() {
+	if ui.CreateProjectBtn.Clicked() {
 		ui.CreateProject()
+	}
+	if ui.EditProjectBtn.Clicked() {
+		ui.EditProject()
 	}
 }
 
@@ -323,7 +327,7 @@ func (ui *UI) layoutRail(gtx C) D {
 		gtx,
 		func(gtx C) D {
 			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
-				btn := material.IconButton(ui.Th, &ui.CreateProjectButton, icons.ContentAdd)
+				btn := material.IconButton(ui.Th, &ui.CreateProjectBtn, icons.ContentAdd)
 				btn.Size = unit.Dp(20)
 				btn.Inset = layout.UniformInset(unit.Dp(8))
 				return btn.Layout(gtx)
@@ -334,49 +338,101 @@ func (ui *UI) layoutRail(gtx C) D {
 }
 
 func (ui *UI) layoutContent(gtx C) D {
-	return layout.Stack{}.Layout(
+	return layout.Flex{
+		Axis: layout.Vertical,
+	}.Layout(
 		gtx,
-		layout.Stacked(func(gtx C) D {
+		// @todo streamline into app bar.
+		layout.Rigid(func(gtx C) D {
 			if ui.Project == nil {
 				return D{}
 			}
-			ui.TicketStates.Begin()
-			return layout.Flex{
-				Axis:    layout.Horizontal,
-				Spacing: layout.SpaceEvenly,
-			}.Layout(
+			return layout.Stack{}.Layout(
 				gtx,
-				func() (panels []layout.FlexChild) {
-					// @decouple this iteration relies on the coincidence that panels are ordered the same.
-					for ii, stage := range ui.Project.Stages {
-						stage := stage
-						panel := ui.Panels[ii]
-						panels = append(panels, layout.Flexed(1, func(gtx C) D {
-							return panel.Layout(gtx, ui.Th, func() (tickets []layout.ListElement) {
-								for _, ticket := range stage.Tickets {
-									ticket := ticket
-									t := (*Ticket)(ui.TicketStates.New(ticket.Title, unsafe.Pointer(&Ticket{})))
-									t.Ticket = ticket
-									t.Stage = stage.Name
-									tickets = append(tickets, func(gtx C, index int) D {
-										return t.Layout(gtx, ui.Th, false)
-									})
-								}
-								return tickets
-							}()...)
-						}))
-					}
-					return panels
-				}()...,
+				layout.Expanded(func(gtx C) D {
+					return util.Rect{
+						Color: color.NRGBA{A: 255},
+						Size: f32.Point{
+							X: float32(gtx.Constraints.Max.X),
+							Y: float32(gtx.Constraints.Min.Y),
+						},
+					}.Layout(gtx)
+				}),
+				layout.Stacked(func(gtx C) D {
+					return layout.Inset{
+						Left:  unit.Dp(10),
+						Right: unit.Dp(10),
+					}.Layout(gtx, func(gtx C) D {
+						return layout.Flex{
+							Axis:      layout.Horizontal,
+							Alignment: layout.Middle,
+						}.Layout(
+							gtx,
+							layout.Rigid(func(gtx C) D {
+								l := material.H5(ui.Th, ui.Project.Name)
+								l.Color = ui.Th.ContrastFg
+								return l.Layout(gtx)
+							}),
+							layout.Flexed(1, func(gtx C) D {
+								return D{Size: image.Point{X: gtx.Constraints.Max.X, Y: gtx.Constraints.Min.Y}}
+							}),
+							layout.Rigid(func(gtx C) D {
+								btn := material.IconButton(ui.Th, &ui.EditProjectBtn, icons.Configuration)
+								btn.Background = color.NRGBA{}
+								btn.Inset = layout.UniformInset(unit.Dp(5))
+								return btn.Layout(gtx)
+							}),
+						)
+					})
+				}),
 			)
 		}),
-		layout.Expanded(func(gtx C) D {
-			if ui.Modal == nil {
-				return D{}
-			}
-			return Modal(gtx, func(gtx C) D {
-				return ui.Modal(gtx)
-			})
+		layout.Flexed(1, func(gtx C) D {
+			return layout.Stack{}.Layout(
+				gtx,
+				layout.Stacked(func(gtx C) D {
+					if ui.Project == nil {
+						return D{}
+					}
+					ui.TicketStates.Begin()
+					return layout.Flex{
+						Axis:    layout.Horizontal,
+						Spacing: layout.SpaceEvenly,
+					}.Layout(
+						gtx,
+						func() (panels []layout.FlexChild) {
+							// @decouple this iteration relies on the coincidence that panels are ordered the same.
+							for ii, stage := range ui.Project.Stages {
+								stage := stage
+								panel := ui.Panels[ii]
+								panels = append(panels, layout.Flexed(1, func(gtx C) D {
+									return panel.Layout(gtx, ui.Th, func() (tickets []layout.ListElement) {
+										for _, ticket := range stage.Tickets {
+											ticket := ticket
+											t := (*Ticket)(ui.TicketStates.New(ticket.Title, unsafe.Pointer(&Ticket{})))
+											t.Ticket = ticket
+											t.Stage = stage.Name
+											tickets = append(tickets, func(gtx C, index int) D {
+												return t.Layout(gtx, ui.Th, false)
+											})
+										}
+										return tickets
+									}()...)
+								}))
+							}
+							return panels
+						}()...,
+					)
+				}),
+				layout.Expanded(func(gtx C) D {
+					if ui.Modal == nil {
+						return D{}
+					}
+					return Modal(gtx, func(gtx C) D {
+						return ui.Modal(gtx)
+					})
+				}),
+			)
 		}),
 	)
 }
@@ -467,7 +523,7 @@ func (ui *UI) InspectTicket(t kanban.Ticket) {
 
 // EditTicket opens the ticket form for editing ticket data.
 func (ui *UI) EditTicket(t kanban.Ticket) {
-	ui.TicketForm.Set(t)
+	ui.TicketForm.Edit(t)
 	ui.Modal = func(gtx C) D {
 		return ui.TicketForm.Layout(gtx, ui.Th, "")
 	}
@@ -481,7 +537,15 @@ func (ui *UI) AddTicket(stage string) {
 	}
 }
 
-// CreatTicket opens the project creation dialog.
+// DeleteTickets opens the confirmation dialog for deleting a ticket.
+func (ui *UI) DeleteTicket(t kanban.Ticket) {
+	ui.DeleteDialog.Ticket = t
+	ui.Modal = func(gtx C) D {
+		return ui.DeleteDialog.Layout(gtx, ui.Th)
+	}
+}
+
+// CreateProject opens the project creation dialog.
 func (ui *UI) CreateProject() {
 	ui.ProjectForm.Name.Focus()
 	ui.Modal = func(gtx C) D {
@@ -489,11 +553,15 @@ func (ui *UI) CreateProject() {
 	}
 }
 
-// DeleteTickets opens the confirmation dialog for deleting a ticket.
-func (ui *UI) DeleteTicket(t kanban.Ticket) {
-	ui.DeleteDialog.Ticket = t
+// EditProject opens the project edit form.
+func (ui *UI) EditProject() {
+	if ui.Project == nil {
+		return
+	}
+	// ui.ProjectForm.Edit(*ui.Project)
+	ui.ProjectForm.Name.Focus()
 	ui.Modal = func(gtx C) D {
-		return ui.DeleteDialog.Layout(gtx, ui.Th)
+		return ui.ProjectForm.Layout(gtx, ui.Th)
 	}
 }
 
