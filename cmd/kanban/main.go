@@ -6,14 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"git.sr.ht/~jackmordaunt/kanban/storage/lazy"
-
 	"github.com/spf13/pflag"
 
 	"gioui.org/font/gofont"
 	"gioui.org/unit"
 	"gioui.org/widget/material"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
+	"git.sr.ht/~jackmordaunt/kanban/storage/lazy"
 	"git.sr.ht/~jackmordaunt/kanban/storage/mem"
 
 	"gioui.org/app"

@@ -98,18 +98,21 @@ type UI struct {
 
 // Loop runs the event loop until terminated.
 func (ui *UI) Loop() error {
+	count, err := ui.Storage.Count()
+	if err != nil {
+		return fmt.Errorf("counting projects: %w", err)
+	}
+	ui.Projects = make(Projects, count)
+	if err := ui.Storage.Load(ui.Projects); err != nil {
+		return fmt.Errorf("loading projects: %w", err)
+	}
+	if len(ui.Projects) > 0 {
+		ui.Project = &ui.Projects[0]
+	}
 	var (
 		ops    op.Ops
 		events = ui.Window.Events()
 	)
-	projects, err := ui.Storage.List()
-	if err != nil {
-		return fmt.Errorf("loading projects: %v", err)
-	}
-	ui.Projects = projects
-	if len(ui.Projects) > 0 {
-		ui.Project = &ui.Projects[0]
-	}
 	for event := range events {
 		switch event := (event).(type) {
 		case system.DestroyEvent:
@@ -136,7 +139,7 @@ func (ui *UI) Shutdown() error {
 
 // Update state based on events.
 //
-// TODO: investigate best way to handle errors. Some errors are for the user
+// TODO(jfm): investigate best way to handle errors. Some errors are for the user
 // and others are for the devs.
 // Currently errors are just printed; not great for windowed applications.
 func (ui *UI) Update(gtx C) {
@@ -294,11 +297,7 @@ func (ui *UI) layoutRail(gtx C) D {
 	var (
 		rc []control.RailChild
 	)
-	projects, err := ui.Storage.List()
-	if err != nil {
-		log.Printf("error: loading projects: %v", err)
-	}
-	for _, p := range projects {
+	for _, p := range ui.Projects {
 		p := p
 		rc = append(rc, control.Destination(p.Name, func(gtx C) D {
 			return layout.Stack{
@@ -401,6 +400,9 @@ func (ui *UI) layoutContent(gtx C) D {
 					}.Layout(
 						gtx,
 						func() (panels []layout.FlexChild) {
+							if len(ui.Panels) == 0 {
+								return panels
+							}
 							// @decouple this iteration relies on the coincidence that panels are ordered the same.
 							for ii, stage := range ui.Project.Stages {
 								stage := stage

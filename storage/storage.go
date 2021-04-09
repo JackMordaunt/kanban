@@ -4,6 +4,7 @@ package storage
 
 import (
 	"git.sr.ht/~jackmordaunt/kanban"
+	"github.com/google/uuid"
 )
 
 // Storer persists Project entities.
@@ -18,6 +19,10 @@ type Storer interface {
 	Load([]kanban.Project) error
 	// Lookup a Project by name.
 	Lookup(name string) (kanban.Project, bool, error)
+	// Find a Project by ID.
+	Find(id uuid.UUID) (kanban.Project, bool, error)
 	// List all existing Projects.
 	List() ([]kanban.Project, error)
+	// Count returns the number of projects that exist in the store.
+	Count() (int, error)
 }

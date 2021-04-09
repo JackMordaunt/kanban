@@ -8,8 +8,9 @@ import (
 
 	"git.sr.ht/~jackmordaunt/kanban"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
+	"git.sr.ht/~jackmordaunt/kanban/storage/bolt"
 	"git.sr.ht/~jackmordaunt/kanban/storage/mem"
-	"git.sr.ht/~jackmordaunt/kanban/storage/storm"
+	"github.com/google/uuid"
 )
 
 var _ storage.Storer = (*Storer)(nil)
@@ -17,13 +18,13 @@ var _ storage.Storer = (*Storer)(nil)
 // Storer writes to disk when a change has been detected.
 type Storer struct {
 	Cache *mem.Storer
-	Disk  *storm.Storer
+	Disk  *bolt.Storer
 }
 
 // Open a lazy storer, initializing the underlying database at the path
 // specified.
 func Open(path string) (*Storer, error) {
-	disk, err := storm.Open(path)
+	disk, err := bolt.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +72,12 @@ func (s *Storer) Lookup(name string) (kanban.Project, bool, error) {
 	return s.Cache.Lookup(name)
 }
 
+// Load a project by ID.
+// Bool indicates whether a project exists for that ID.
+func (s *Storer) Find(id uuid.UUID) (kanban.Project, bool, error) {
+	return s.Cache.Find(id)
+}
+
 // List projects.
 func (s *Storer) List() ([]kanban.Project, error) {
 	return s.Disk.List()
@@ -108,4 +115,8 @@ func (s *Storer) Load(projects []kanban.Project) error {
 
 func (s *Storer) Close() error {
 	return s.Disk.DB.Close()
+}
+
+func (s *Storer) Count() (int, error) {
+	return s.Cache.Count()
 }

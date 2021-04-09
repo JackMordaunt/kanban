@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"git.sr.ht/~jackmordaunt/kanban/storage"
+	"github.com/google/uuid"
 
 	"git.sr.ht/~jackmordaunt/kanban"
 )
@@ -47,6 +48,19 @@ func (s *Storer) Lookup(name string) (kanban.Project, bool, error) {
 		return p, ok, nil
 	}
 	return kanban.Project{}, false, nil
+}
+
+func (s *Storer) Find(id uuid.UUID) (kanban.Project, bool, error) {
+	for _, p := range s.Data {
+		if p.ID == id {
+			return s.Data[p.Name], true, nil
+		}
+	}
+	return kanban.Project{}, false, nil
+}
+
+func (s *Storer) Count() (int, error) {
+	return len(s.Data), nil
 }
 
 func (s *Storer) List() (list []kanban.Project, err error) {
