@@ -20,6 +20,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// Mode signals the form mode.
+// Typically a form is either dealing with an entity to be created, or
+// manipulating an existing entity.
+type Mode int
+
+const (
+	ModeCreate Mode = iota
+	ModeEdit
+)
+
 // TicketForm renders the form for ticket information.
 //
 // @Todo use form pattern from avisha.
@@ -99,30 +109,37 @@ func (f *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 
 // ProjectForm renders a form for manipulating projects.
 type ProjectForm struct {
-	kanban.Project
+	*kanban.Project
 	Name      component.TextField
 	SubmitBtn widget.Clickable
 	CancelBtn widget.Clickable
 }
 
 // Edit the provided project.
-func (f *ProjectForm) Edit(p kanban.Project) {
+func (f *ProjectForm) Edit(p *kanban.Project) {
 	f.Project = p
 	f.Name.SetText(p.Name)
 }
 
-func (f *ProjectForm) Submit() kanban.Project {
-	defer func() {
-		f.Project = kanban.Project{}
-	}()
-	return kanban.Project{
-		Name: f.Name.Text(),
+// Submit writes form data to the entity.
+func (f *ProjectForm) Submit() {
+	f.Project.Name = f.Name.Text()
+}
+
+func (f *ProjectForm) Mode() Mode {
+	if f.Project.ID != uuid.Nil {
+		return ModeEdit
 	}
+	return ModeCreate
 }
 
 func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
+	var title = "Create a new Project"
+	if f.Project != nil {
+		title = "Edit Project"
+	}
 	return control.Card{
-		Title: "Create a new Project",
+		Title: title,
 		Body: func(gtx C) D {
 			return layout.Flex{
 				Axis: layout.Vertical,

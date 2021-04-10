@@ -175,25 +175,27 @@ func (ui *UI) Update(gtx C) {
 		}
 	}
 	if ui.ProjectForm.SubmitBtn.Clicked() {
-		// @cleanup
-		// Could we enforce this relationship with the api?
-		// Perhaps pass in the projects slice and have it append to it.
-		if err := ui.Storage.Create(kanban.Project{
-			ID:   uuid.New(),
-			Name: ui.ProjectForm.Name.Text(),
-			Stages: []kanban.Stage{
-				{Name: "Todo"},
-				{Name: "In Progress"},
-				{Name: "Testing"},
-				{Name: "Done"},
-			},
-		}); err != nil {
-			log.Printf("creating new project: %v", err)
-		} else {
-			if projects, err := ui.Storage.List(); err == nil {
-				ui.Projects = projects
+		if ui.ProjectForm.Mode() == ModeEdit {
+			ui.ProjectForm.Submit()
+		}
+		if ui.ProjectForm.Mode() == ModeCreate {
+			if err := ui.Storage.Create(kanban.Project{
+				ID:   uuid.New(),
+				Name: ui.ProjectForm.Name.Text(),
+				Stages: []kanban.Stage{
+					{Name: "Todo"},
+					{Name: "In Progress"},
+					{Name: "Testing"},
+					{Name: "Done"},
+				},
+			}); err != nil {
+				log.Printf("creating new project: %v", err)
 			} else {
-				log.Printf("listing projects: %v", err)
+				if projects, err := ui.Storage.List(); err == nil {
+					ui.Projects = projects
+				} else {
+					log.Printf("listing projects: %v", err)
+				}
 			}
 		}
 		ui.Clear()
@@ -560,7 +562,7 @@ func (ui *UI) EditProject() {
 	if ui.Project == nil {
 		return
 	}
-	// ui.ProjectForm.Edit(*ui.Project)
+	ui.ProjectForm.Edit(ui.Project)
 	ui.ProjectForm.Name.Focus()
 	ui.Modal = func(gtx C) D {
 		return ui.ProjectForm.Layout(gtx, ui.Th)
@@ -573,10 +575,9 @@ type Projects []kanban.Project
 // Find and return project by name.
 // Boolean indicates whether the project exists.
 func (plist Projects) Find(name string) (*kanban.Project, bool) {
-	for _, p := range plist {
-		p := p
-		if p.Name == name {
-			return &p, true
+	for ii := range plist {
+		if plist[ii].Name == name {
+			return &plist[ii], true
 		}
 	}
 	return nil, false

@@ -13,29 +13,29 @@ var _ storage.Storer = (*Storer)(nil)
 
 // Storer implements in-memory storage for Projects.
 type Storer struct {
-	Data  map[string]kanban.Project
-	Order []string
+	Data  map[uuid.UUID]kanban.Project
+	Order []uuid.UUID
 }
 
 func New() *Storer {
 	return &Storer{
-		Data: make(map[string]kanban.Project),
+		Data: make(map[uuid.UUID]kanban.Project),
 	}
 }
 
 func (s *Storer) Create(p kanban.Project) error {
-	if _, ok := s.Data[p.Name]; ok {
+	if _, ok := s.Data[p.ID]; ok {
 		return fmt.Errorf("project %q exists", p.Name)
 	}
-	s.Data[p.Name] = p
-	s.Order = append(s.Order, p.Name)
+	s.Data[p.ID] = p
+	s.Order = append(s.Order, p.ID)
 	return nil
 }
 
 func (s *Storer) Save(projects ...kanban.Project) error {
 	for _, p := range projects {
-		if _, ok := s.Data[p.Name]; ok {
-			s.Data[p.Name] = p
+		if _, ok := s.Data[p.ID]; ok {
+			s.Data[p.ID] = p
 		} else {
 			return fmt.Errorf("project %q does not exist", p.Name)
 		}
@@ -43,17 +43,10 @@ func (s *Storer) Save(projects ...kanban.Project) error {
 	return nil
 }
 
-func (s *Storer) Lookup(name string) (kanban.Project, bool, error) {
-	if p, ok := s.Data[name]; ok {
-		return p, ok, nil
-	}
-	return kanban.Project{}, false, nil
-}
-
 func (s *Storer) Find(id uuid.UUID) (kanban.Project, bool, error) {
 	for _, p := range s.Data {
 		if p.ID == id {
-			return s.Data[p.Name], true, nil
+			return s.Data[p.ID], true, nil
 		}
 	}
 	return kanban.Project{}, false, nil
@@ -64,8 +57,8 @@ func (s *Storer) Count() (int, error) {
 }
 
 func (s *Storer) List() (list []kanban.Project, err error) {
-	for _, name := range s.Order {
-		if p, ok := s.Data[name]; ok {
+	for _, id := range s.Order {
+		if p, ok := s.Data[id]; ok {
 			list = append(list, p)
 		}
 	}
@@ -74,7 +67,7 @@ func (s *Storer) List() (list []kanban.Project, err error) {
 
 func (s *Storer) Load(projects []kanban.Project) error {
 	for ii := range projects {
-		p := s.Data[projects[ii].Name]
+		p := s.Data[projects[ii].ID]
 		projects[ii] = p
 	}
 	return nil

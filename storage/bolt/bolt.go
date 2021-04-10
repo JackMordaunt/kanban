@@ -10,6 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
+var _ storage.Storer = (*Storer)(nil)
+
+type Storer struct {
+	*bolt.DB
+}
+
 type Bucket []byte
 
 func (b Bucket) String() string {
@@ -19,12 +25,6 @@ func (b Bucket) String() string {
 var (
 	BucketProject Bucket = Bucket("Project")
 )
-
-var _ storage.Storer = (*Storer)(nil)
-
-type Storer struct {
-	*bolt.DB
-}
 
 func Open(path string) (*Storer, error) {
 	db, err := bolt.Open(path, 0660, nil)
@@ -79,23 +79,6 @@ func (db *Storer) Save(projects ...kanban.Project) error {
 			}
 			if err := tx.Bucket(BucketProject).Put(id, v); err != nil {
 				return fmt.Errorf("updating project: %w", err)
-			}
-		}
-		return nil
-	})
-}
-
-func (db *Storer) Lookup(name string) (p kanban.Project, ok bool, err error) {
-	// @enhance: index by name
-	return p, ok, db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(BucketProject).Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if err := json.Unmarshal(v, &p); err != nil {
-				return fmt.Errorf("deserializing project: %w", err)
-			}
-			if p.Name == name {
-				ok = true
-				break
 			}
 		}
 		return nil

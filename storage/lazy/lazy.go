@@ -49,7 +49,7 @@ func (s *Storer) Create(p kanban.Project) error {
 // Save a project. Only saves to disk if changed.
 func (s *Storer) Save(projects ...kanban.Project) error {
 	for _, p := range projects {
-		old, ok, err := s.Cache.Lookup(p.Name)
+		old, ok, err := s.Cache.Find(p.ID)
 		if err != nil {
 			return err
 		}
@@ -60,16 +60,10 @@ func (s *Storer) Save(projects ...kanban.Project) error {
 			if err := s.Disk.Save(p); err != nil {
 				return fmt.Errorf("saving to disk: %v", err)
 			}
-			return s.Refresh(p.Name)
+			return s.Refresh(p.ID)
 		}
 	}
 	return nil
-}
-
-// Load a project by name.
-// Bool indicates whether a project exists for that name.
-func (s *Storer) Lookup(name string) (kanban.Project, bool, error) {
-	return s.Cache.Lookup(name)
 }
 
 // Load a project by ID.
@@ -84,13 +78,13 @@ func (s *Storer) List() ([]kanban.Project, error) {
 }
 
 // Refresh a project entity by loading from disk.
-func (s *Storer) Refresh(name string) error {
-	p, ok, err := s.Disk.Lookup(name)
+func (s *Storer) Refresh(id uuid.UUID) error {
+	p, ok, err := s.Disk.Find(id)
 	if err != nil {
 		return fmt.Errorf("loading from disk: %v", err)
 	}
 	if !ok {
-		return fmt.Errorf("project does not exist: %v", name)
+		return fmt.Errorf("project does not exist: %v", id)
 	}
 	return s.Cache.Save(p)
 }

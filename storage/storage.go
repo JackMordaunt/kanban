@@ -17,8 +17,6 @@ type Storer interface {
 	// Allows caller to allocate and control memory.
 	// Avoids copying.
 	Load([]kanban.Project) error
-	// Lookup a Project by name.
-	Lookup(name string) (kanban.Project, bool, error)
 	// Find a Project by ID.
 	Find(id uuid.UUID) (kanban.Project, bool, error)
 	// List all existing Projects.
