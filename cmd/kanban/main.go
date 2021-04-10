@@ -5,7 +5,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/pkg/profile"
 	"github.com/spf13/pflag"
 
 	"gioui.org/font/gofont"
@@ -20,14 +22,19 @@ import (
 
 var (
 	MemStorage bool
+	ProfileOpt string
 )
 
 func init() {
 	pflag.BoolVar(&MemStorage, "mem-storage", false, "store entities in memory")
+	pflag.StringVar(&ProfileOpt, "profile", "", fmt.Sprintf("record runtime performance statistics %s", profiles))
 	pflag.Parse()
 }
 
 func main() {
+	if stopper := Profile(ProfileOpt).Start(); stopper != nil {
+		defer stopper.Stop()
+	}
 	storage, err := func() (storage.Storer, error) {
 		if MemStorage {
 			return mem.New(), nil
@@ -59,4 +66,46 @@ func main() {
 		os.Exit(0)
 	}()
 	app.Main()
+}
+
+// Profile starts a profiler based on the provided option.
+type Profile string
+
+var (
+	CPU   Profile = "cpu"
+	Mem   Profile = "mem"
+	Block Profile = "block"
+	Trace Profile = "trace"
+
+	profiles = Profiles{
+		CPU,
+		Mem,
+		Block,
+		Trace,
+	}
+)
+
+func (p Profile) Start() interface{ Stop() } {
+	switch p {
+	case "cpu":
+		return profile.Start(profile.CPUProfile)
+	case "mem":
+		return profile.Start(profile.MemProfile)
+	}
+	return nil
+}
+
+type Profiles []Profile
+
+func (p Profiles) String() string {
+	var s strings.Builder
+	s.WriteByte('[')
+	for ii, opt := range p {
+		s.WriteString(string(opt))
+		if ii != len(p)-1 {
+			s.WriteString(", ")
+		}
+	}
+	s.WriteByte(']')
+	return s.String()
 }
