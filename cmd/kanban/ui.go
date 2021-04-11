@@ -81,10 +81,11 @@ type UI struct {
 	Modal layout.Widget
 
 	// Form state.
-	TicketForm    TicketForm
-	TicketDetails TicketDetails
-	DeleteDialog  DeleteDialog
-	ProjectForm   ProjectForm
+	TicketForm                 TicketForm
+	TicketDetails              TicketDetails
+	DeleteDialog               DeleteDialog
+	ProjectForm                ProjectForm
+	ArchiveProjectConfirmation ArchiveProjectConfirmation
 
 	// FocusedTicket struct {
 	// 	ID    kanban.ID
@@ -274,6 +275,24 @@ func (ui *UI) Update(gtx C) {
 	if ui.EditProjectBtn.Clicked() {
 		ui.EditProject()
 	}
+	if ui.ProjectForm.Delete.Button.Clicked() {
+		ui.ShowDeleteProjectConfirmation()
+	}
+	if ui.ArchiveProjectConfirmation.SubmitBtn.Clicked() {
+		if ui.ArchiveProjectConfirmation.Confirmation.Text() == ui.Project.Name {
+			if err := ui.Storage.Archive(ui.Project.ID); err != nil {
+				log.Printf("error: archiving project: %v", err)
+			}
+			ui.Save()
+			if len(ui.Projects) > 0 {
+				ui.Project = &ui.Projects[0]
+			}
+			ui.Clear()
+		}
+	}
+	if ui.ArchiveProjectConfirmation.CancelBtn.Clicked() {
+		ui.Clear()
+	}
 }
 
 // Layout UI.
@@ -452,56 +471,7 @@ const (
 
 // Refocus to the ticket in the given direction.
 // Allows movement between tickets and stages in sequential order.
-func (ui *UI) Refocus(d Direction) {
-	// var (
-	// 	project kanban.Project
-	// 	stage kanban.Stage
-	// )
-	// if err := ui.Project.Find("ID", ui.ActiveProject, &project); err != nil {
-	// 	log.Printf("error: %v", err)
-	// 	return
-	// }
-	// if err := ui.Project.Find("ID", projet.St)
-
-	// for {
-	// 	switch d {
-	// 	case NextTicket:
-	// 		ui.FocusedTicket.Index++
-	// 		if ui.FocusedTicket.Index > len(stages[ui.FocusedTicket.Stage].Tickets) {
-	// 			ui.FocusedTicket.Index = 1
-	// 			ui.FocusedTicket.Stage++
-	// 			if ui.FocusedTicket.Stage > len(stages)-1 {
-	// 				ui.FocusedTicket.Stage = 0
-	// 			}
-	// 		}
-	// 	case PreviousTicket:
-	// 		ui.FocusedTicket.Index--
-	// 		if ui.FocusedTicket.Index < 1 {
-	// 			ui.FocusedTicket.Stage--
-	// 			if ui.FocusedTicket.Stage < 0 {
-	// 				ui.FocusedTicket.Stage = len(stages) - 1
-	// 			}
-	// 			ui.FocusedTicket.Index = len(stages[ui.FocusedTicket.Stage].Tickets)
-	// 		}
-	// 	case NextStage:
-	// 		ui.FocusedTicket.Index = 1
-	// 		ui.FocusedTicket.Stage++
-	// 		if ui.FocusedTicket.Stage > len(stages)-1 {
-	// 			ui.FocusedTicket.Stage = 0
-	// 		}
-	// 	case PreviousStage:
-	// 		ui.FocusedTicket.Index = 1
-	// 		ui.FocusedTicket.Stage--
-	// 		if ui.FocusedTicket.Stage < 0 {
-	// 			ui.FocusedTicket.Stage = len(stages) - 1
-	// 		}
-	// 	}
-	// 	if stage := stages[ui.FocusedTicket.Stage]; !stage.Empty() {
-	// 		break
-	// 	}
-	// }
-	// ui.FocusedTicket.ID = stages[ui.FocusedTicket.Stage].Tickets[ui.FocusedTicket.Index-1].ID
-}
+func (ui *UI) Refocus(d Direction) {}
 
 // Clear resets navigational state.
 func (ui *UI) Clear() {
@@ -509,12 +479,7 @@ func (ui *UI) Clear() {
 	ui.TicketForm = TicketForm{}
 	ui.ProjectForm = ProjectForm{}
 	ui.DeleteDialog = DeleteDialog{}
-	// @cleanup
-	// ui.FocusedTicket = struct {
-	// 	ID    kanban.ID
-	// 	Index int
-	// 	Stage kanban.ID
-	// }{}
+	ui.ArchiveProjectConfirmation = ArchiveProjectConfirmation{}
 }
 
 // InspectTicket opens the ticket details card for the given ticket.
@@ -569,6 +534,15 @@ func (ui *UI) EditProject() {
 	}
 }
 
+func (ui *UI) ShowDeleteProjectConfirmation() {
+	if ui.Project == nil {
+		return
+	}
+	ui.Modal = func(gtx C) D {
+		return ui.ArchiveProjectConfirmation.Layout(gtx, ui.Th)
+	}
+}
+
 // Projects is a list of Project entities with added behaviours.
 type Projects []kanban.Project
 
@@ -594,6 +568,12 @@ func (ui *UI) Load() {
 func (ui *UI) Save() {
 	if err := ui.Storage.Save(ui.Projects...); err != nil {
 		log.Printf("error: saving projects: %v", err)
+	}
+	// Remove any zeroed out projects because they don't exist anymore.
+	for ii, p := range ui.Projects {
+		if p.ID == uuid.Nil {
+			ui.Projects = append(ui.Projects[:ii], ui.Projects[ii+1:]...)
+		}
 	}
 }
 

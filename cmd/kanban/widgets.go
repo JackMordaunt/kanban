@@ -110,7 +110,10 @@ func (f *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
 // ProjectForm renders a form for manipulating projects.
 type ProjectForm struct {
 	*kanban.Project
-	Name      component.TextField
+	Name   component.TextField
+	Delete struct {
+		Button widget.Clickable
+	}
 	SubmitBtn widget.Clickable
 	CancelBtn widget.Clickable
 }
@@ -127,7 +130,7 @@ func (f *ProjectForm) Submit() {
 }
 
 func (f *ProjectForm) Mode() Mode {
-	if f.Project.ID != uuid.Nil {
+	if f.Project != nil {
 		return ModeEdit
 	}
 	return ModeCreate
@@ -147,6 +150,14 @@ func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
 				gtx,
 				layout.Rigid(func(gtx C) D {
 					return f.Name.Layout(gtx, th, "Project Name")
+				}),
+				layout.Rigid(func(gtx C) D {
+					if f.Mode() != ModeEdit {
+						return D{}
+					}
+					btn := material.Button(th, &f.Delete.Button, "Archive")
+					btn.Background = color.NRGBA{R: 200, A: 200}
+					return btn.Layout(gtx)
 				}),
 			)
 		},
@@ -452,6 +463,46 @@ func (t *TicketDetails) Layout(gtx C, th *material.Theme) D {
 			},
 			{
 				Clickable: &t.Cancel,
+				Label:     "Cancel",
+				Fg:        th.Fg,
+				Bg:        th.Bg,
+			},
+		},
+	}.Layout(gtx, th)
+}
+
+// ArchiveProjectConfirmation displays a dialog prompting the user to confirm
+// the name of the project to confirm the archival.
+// This is a safety step to avoid accidentally archiving a project.
+type ArchiveProjectConfirmation struct {
+	Confirmation component.TextField
+	SubmitBtn    widget.Clickable
+	CancelBtn    widget.Clickable
+}
+
+func (dpc *ArchiveProjectConfirmation) Layout(gtx C, th *material.Theme) D {
+	return control.Card{
+		Title: "Archive Project",
+		Body: func(gtx C) D {
+			return layout.Flex{
+				Axis:      layout.Vertical,
+				Alignment: layout.Middle,
+			}.Layout(
+				gtx,
+				layout.Rigid(func(gtx C) D {
+					return dpc.Confirmation.Layout(gtx, th, "Project")
+				}),
+			)
+		},
+		Actions: []control.Action{
+			{
+				Clickable: &dpc.SubmitBtn,
+				Label:     "Archive",
+				Fg:        th.ContrastFg,
+				Bg:        color.NRGBA{R: 200, A: 255},
+			},
+			{
+				Clickable: &dpc.CancelBtn,
 				Label:     "Cancel",
 				Fg:        th.Fg,
 				Bg:        th.Bg,

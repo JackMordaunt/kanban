@@ -23,4 +23,12 @@ type Storer interface {
 	List() ([]kanban.Project, error)
 	// Count returns the number of projects that exist in the store.
 	Count() (int, error)
+	// Archive a project.
+	// An archived project will have it's data saved, but won't show up under
+	// normal queries.
+	Archive(uuid.UUID) error
+	// ListArchived lists all archived projects.
+	ListArchived() ([]kanban.Project, error)
+	// Restore takes an archived project and makes it live again.
+	Restore(uuid.UUID) error
 }

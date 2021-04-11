@@ -14,8 +14,7 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget/material"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
-	"git.sr.ht/~jackmordaunt/kanban/storage/lazy"
-	"git.sr.ht/~jackmordaunt/kanban/storage/mem"
+	"git.sr.ht/~jackmordaunt/kanban/storage/bolt"
 
 	"gioui.org/app"
 )
@@ -36,17 +35,13 @@ func main() {
 		defer stopper.Stop()
 	}
 	storage, err := func() (storage.Storer, error) {
-		if MemStorage {
-			return mem.New(), nil
-		} else {
-			data, err := app.DataDir()
-			if err != nil {
-				return nil, fmt.Errorf("data dir: %v", err)
-			}
-			db := filepath.Join(data, "kanban.db")
-			fmt.Printf("%s\n", db)
-			return lazy.Open(db)
+		data, err := app.DataDir()
+		if err != nil {
+			return nil, fmt.Errorf("data dir: %v", err)
 		}
+		db := filepath.Join(data, "kanban.db")
+		fmt.Printf("%s\n", db)
+		return bolt.Open(db)
 	}()
 	if err != nil {
 		log.Fatalf("storage driver: %v\n", err)
