@@ -14,7 +14,7 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget/material"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
-	"git.sr.ht/~jackmordaunt/kanban/storage/bolt"
+	"git.sr.ht/~jackmordaunt/kanban/storage/lazy"
 
 	"gioui.org/app"
 )
@@ -41,7 +41,7 @@ func main() {
 		}
 		db := filepath.Join(data, "kanban.db")
 		fmt.Printf("%s\n", db)
-		return bolt.Open(db)
+		return lazy.Open(db)
 	}()
 	if err != nil {
 		log.Fatalf("storage driver: %v\n", err)

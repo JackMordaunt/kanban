@@ -12,32 +12,38 @@ import (
 
 // Storer implements in-memory storage for Projects.
 type Storer struct {
-	Data          map[uuid.UUID]kanban.Project
-	Order         []uuid.UUID
-	Archived      map[uuid.UUID]kanban.Project
-	ArchivedOrder []uuid.UUID
+	Active   Bucket
+	Archived Bucket
+}
+
+type Bucket struct {
+	Data  map[uuid.UUID]kanban.Project
+	Order []uuid.UUID
 }
 
 func New() *Storer {
 	return &Storer{
-		Data:     make(map[uuid.UUID]kanban.Project),
-		Archived: make(map[uuid.UUID]kanban.Project),
+		Active: Bucket{
+			Data: make(map[uuid.UUID]kanban.Project),
+		},
+		Archived: Bucket{
+			Data: make(map[uuid.UUID]kanban.Project),
+		},
 	}
 }
 
 func (s *Storer) Create(p kanban.Project) error {
-	if _, ok := s.Data[p.ID]; ok {
+	if _, ok := s.Active.Data[p.ID]; ok {
 		return fmt.Errorf("project %q exists", p.Name)
 	}
-	s.Data[p.ID] = p
-	s.Order = append(s.Order, p.ID)
+	s.Active.Add(p)
 	return nil
 }
 
 func (s *Storer) Save(projects ...kanban.Project) error {
 	for _, p := range projects {
-		if _, ok := s.Data[p.ID]; ok {
-			s.Data[p.ID] = p
+		if _, ok := s.Active.Data[p.ID]; ok {
+			s.Active.Data[p.ID] = p.Clone()
 		} else {
 			return fmt.Errorf("project %q does not exist", p.Name)
 		}
@@ -45,61 +51,77 @@ func (s *Storer) Save(projects ...kanban.Project) error {
 	return nil
 }
 
-func (s *Storer) Find(id uuid.UUID) (kanban.Project, bool, error) {
-	for _, p := range s.Data {
-		if p.ID == id {
-			return s.Data[p.ID], true, nil
-		}
-	}
-	return kanban.Project{}, false, nil
+func (s *Storer) Find(id uuid.UUID) (p kanban.Project, ok bool, err error) {
+	p, ok = s.Active.Data[id]
+	return p.Clone(), ok, nil
 }
 
 func (s *Storer) Count() (int, error) {
-	return len(s.Data), nil
+	return len(s.Active.Data), nil
 }
 
 func (s *Storer) List() (list []kanban.Project, err error) {
-	for _, id := range s.Order {
-		if p, ok := s.Data[id]; ok {
-			list = append(list, p)
-		}
-	}
-	return list, nil
+	return s.Active.List(), nil
 }
 
 func (s *Storer) Load(projects []kanban.Project) error {
 	for ii := range projects {
-		p := s.Data[projects[ii].ID]
-		projects[ii] = p
+		projects[ii] = s.Active.Data[projects[ii].ID].Clone()
 	}
 	return nil
 }
 
 func (s *Storer) Archive(id uuid.UUID) error {
-	p, ok := s.Data[id]
+	p, ok := s.Active.Data[id]
 	if !ok {
 		return nil
 	}
-	delete(s.Data, id)
-	s.Archived[id] = p
+	s.Active.Delete(id)
+	s.Archived.Add(p)
 	return nil
 }
 
 func (s *Storer) Restore(id uuid.UUID) error {
-	p, ok := s.Archived[id]
+	p, ok := s.Archived.Data[id]
 	if !ok {
 		return nil
 	}
-	delete(s.Archived, id)
-	s.Data[id] = p
+	s.Archived.Delete(id)
+	s.Active.Add(p)
 	return nil
 }
 
 func (s *Storer) ListArchived() (list []kanban.Project, err error) {
-	for _, id := range s.ArchivedOrder {
-		if p, ok := s.Archived[id]; ok {
-			list = append(list, p)
+	return s.Archived.List(), nil
+}
+
+func (s *Storer) Clear() {
+	s.Active = Bucket{
+		Data: make(map[uuid.UUID]kanban.Project),
+	}
+	s.Archived = Bucket{
+		Data: make(map[uuid.UUID]kanban.Project),
+	}
+}
+
+func (b *Bucket) Add(p kanban.Project) {
+	b.Data[p.ID] = p
+	b.Order = append(b.Order, p.ID)
+}
+
+func (b *Bucket) Delete(id uuid.UUID) {
+	delete(b.Data, id)
+	for ii := range b.Order {
+		if b.Order[ii] == id {
+			b.Order = append(b.Order[:ii], b.Order[ii+1:]...)
+			break
 		}
 	}
-	return list, nil
+}
+
+func (b *Bucket) List() (list []kanban.Project) {
+	for _, id := range b.Order {
+		list = append(list, b.Data[id])
+	}
+	return list
 }

@@ -572,7 +572,9 @@ func (ui *UI) Save() {
 	// Remove any zeroed out projects because they don't exist anymore.
 	for ii, p := range ui.Projects {
 		if p.ID == uuid.Nil {
-			ui.Projects = append(ui.Projects[:ii], ui.Projects[ii+1:]...)
+			if len(ui.Projects) > 1 {
+				ui.Projects = append(ui.Projects[:ii], ui.Projects[ii+1:]...)
+			}
 		}
 	}
 }

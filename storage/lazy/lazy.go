@@ -4,7 +4,6 @@ package lazy
 
 import (
 	"fmt"
-	"reflect"
 
 	"git.sr.ht/~jackmordaunt/kanban"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
@@ -16,9 +15,15 @@ import (
 var _ storage.Storer = (*Storer)(nil)
 
 // Storer writes to disk when a change has been detected.
+//
+// Reads come directly from disk because it is memory mapped.
+// Cache simply holds old values so that we can detect for changes
+// to know when to write data.
+//
+// Writes get flushed to disk, hence that is the work being minimized.
 type Storer struct {
 	Cache *mem.Storer
-	Disk  *bolt.Storer
+	*bolt.Storer
 }
 
 // Open a lazy storer, initializing the underlying database at the path
@@ -29,123 +34,69 @@ func Open(path string) (*Storer, error) {
 		return nil, err
 	}
 	s := Storer{
-		Cache: mem.New(),
-		Disk:  disk,
+		Cache:  mem.New(),
+		Storer: disk,
 	}
-	return &s, s.Populate()
-}
-
-// Create a project. Saves to disk.
-func (s *Storer) Create(p kanban.Project) error {
-	if err := s.Cache.Create(p); err != nil {
-		return fmt.Errorf("creating on disk: %w", err)
+	if err := s.Populate(); err != nil {
+		return nil, err
 	}
-	if err := s.Disk.Create(p); err != nil {
-		return fmt.Errorf("creating on disk: %w", err)
-	}
-	return nil
+	return &s, nil
 }
 
 // Save a project. Only saves to disk if changed.
 func (s *Storer) Save(projects ...kanban.Project) error {
+	var save []kanban.Project
 	for _, p := range projects {
 		old, ok, err := s.Cache.Find(p.ID)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("project does not exist: %q", p.Name)
+			s.Cache.Active.Add(p)
+			continue
 		}
-		if !reflect.DeepEqual(p, old) {
-			if err := s.Disk.Save(p); err != nil {
-				return fmt.Errorf("saving to disk: %w", err)
-			}
-			return s.Refresh(p.ID)
+		if !p.Eq(&old) {
+			save = append(save, p)
 		}
+	}
+	if len(save) > 0 {
+		if err := s.Storer.Save(save...); err != nil {
+			return fmt.Errorf("saving to disk: %w", err)
+		}
+		return s.Populate()
 	}
 	return nil
 }
 
-// Load a project by ID.
-// Bool indicates whether a project exists for that ID.
-func (s *Storer) Find(id uuid.UUID) (kanban.Project, bool, error) {
-	return s.Cache.Find(id)
-}
-
-// List projects.
-func (s *Storer) List() ([]kanban.Project, error) {
-	return s.Cache.List()
-}
-
 // Refresh a project entity by loading from disk.
 func (s *Storer) Refresh(id uuid.UUID) error {
-	p, ok, err := s.Disk.Find(id)
+	p, ok, err := s.Storer.Find(id)
 	if err != nil {
 		return fmt.Errorf("loading from disk: %w", err)
 	}
 	if !ok {
 		return fmt.Errorf("project does not exist: %v", id)
 	}
-	return s.Cache.Save(p)
+	s.Cache.Active.Add(p)
+	return nil
 }
 
 // Populate cache from disk.
 func (s *Storer) Populate() error {
-	projects, err := s.Disk.List()
+	s.Cache.Clear()
+	projects, err := s.Storer.List()
 	if err != nil {
 		return fmt.Errorf("loading projects from disk: %w", err)
 	}
 	for _, p := range projects {
-		if err := s.Cache.Create(p); err != nil {
-			return fmt.Errorf("saving project to cache: %w", err)
-		}
+		s.Cache.Active.Add(p)
 	}
-	archived, err := s.Disk.ListArchived()
+	archived, err := s.Storer.ListArchived()
 	if err != nil {
 		return fmt.Errorf("loading archived projects from disk: %w", err)
 	}
 	for _, p := range archived {
-		if err := func() error {
-			if err := s.Cache.Create(p); err != nil {
-				return err
-			}
-			if err := s.Cache.Archive(p.ID); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return fmt.Errorf("saving archived projects to cache: %w", err)
-		}
+		s.Cache.Archived.Add(p)
 	}
 	return nil
-}
-
-func (s *Storer) Load(projects []kanban.Project) error {
-	return s.Cache.Load(projects)
-}
-
-func (s *Storer) Close() error {
-	return s.Disk.DB.Close()
-}
-
-func (s *Storer) Count() (int, error) {
-	return s.Cache.Count()
-}
-
-func (s *Storer) Archive(id uuid.UUID) error {
-	if err := s.Disk.Archive(id); err != nil {
-		return err
-	}
-	return s.Populate()
-}
-
-func (s *Storer) Restore(id uuid.UUID) error {
-	if err := s.Disk.Restore(id); err != nil {
-		return err
-	}
-	return s.Populate()
-}
-
-func (s *Storer) ListArchived() ([]kanban.Project, error) {
-	return s.Cache.ListArchived()
 }

@@ -284,3 +284,53 @@ func (p *Project) String() string {
 	}
 	return fmt.Sprintf("%v", *p)
 }
+
+// Clone a project ensuring all data is copied.
+func (p Project) Clone() Project {
+	var (
+		stages    = make([]Stage, len(p.Stages))
+		finalized = make([]Ticket, len(p.Finalized))
+	)
+	copy(finalized, p.Finalized)
+	for ii, s := range p.Stages {
+		tickets := make([]Ticket, len(s.Tickets))
+		copy(tickets, s.Tickets)
+		stages[ii] = Stage{
+			Name:    s.Name,
+			Tickets: tickets,
+		}
+	}
+	return Project{
+		ID:        p.ID,
+		Name:      p.Name,
+		Stages:    stages,
+		Finalized: finalized,
+	}
+}
+
+func (p *Project) Eq(other *Project) bool {
+	return p.ID == other.ID &&
+		p.Name == other.Name &&
+		p.Stages.Eq(other.Stages)
+}
+
+func (s Stages) Eq(other Stages) bool {
+	for ii := range s {
+		if !s[ii].Eq(other[ii]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (s Stage) Eq(other Stage) bool {
+	if len(s.Tickets) != len(other.Tickets) {
+		return false
+	}
+	for ii, t := range s.Tickets {
+		if t != other.Tickets[ii] {
+			return false
+		}
+	}
+	return s.Name == other.Name
+}
