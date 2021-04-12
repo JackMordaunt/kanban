@@ -57,7 +57,7 @@ type UI struct {
 
 	// Project is the currently active kanban Project.
 	// Contains the state and methods for kanban operations.
-	// Points to memory allocated by the storage implementation.
+	// Points into Projects slice.
 	// nil value implies no active project.
 	Project *kanban.Project
 
