@@ -16,6 +16,7 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"gioui.org/x/eventx"
 	"git.sr.ht/~jackmordaunt/kanban"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/control"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/state"
@@ -293,15 +294,27 @@ func (ui *UI) Update(gtx C) {
 
 // Layout UI.
 func (ui *UI) Layout(gtx C) D {
-	// NOTE(jfm): modal implies a more specific key focus.
-	//
-	// @BUG(jfm): ESC cannot clear when inputs steal key focus.
-	// SOLUTION: make the inputs repsond to esc by cancelling focus of the input.
-	// Then somehow give focus back to ui.
+	// NOTE(jfm): an active modal implies a more specific key focus: to that
+	// modal widget.
 	key.InputOp{Tag: ui}.Add(gtx.Ops)
 	if ui.Modal == nil {
 		key.FocusOp{Tag: ui}.Add(gtx.Ops)
 	}
+	// Spy on the events so that we can do some global actions regardless of
+	// focus.
+	spy, gtx := eventx.Enspy(gtx)
+	defer func() {
+		for _, group := range spy.AllEvents() {
+			for _, event := range group.Items {
+				if k, ok := event.(key.Event); ok {
+					if k.State == key.Press && k.Name == key.NameEscape {
+						ui.Clear()
+						return
+					}
+				}
+			}
+		}
+	}()
 	return layout.Flex{
 		Axis: layout.Horizontal,
 	}.Layout(
