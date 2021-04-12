@@ -87,11 +87,12 @@ type UI struct {
 	ProjectForm                ProjectForm
 	ArchiveProjectConfirmation ArchiveProjectConfirmation
 
-	// FocusedTicket struct {
-	// 	ID    kanban.ID
-	// 	Index int
-	// 	Stage kanban.ID
-	// }
+	// Focus tracks the focused ticket for keyboard navigation.
+	Focus struct {
+		Stage  int
+		Ticket int
+		T      *kanban.Ticket
+	}
 
 	CreateProjectBtn widget.Clickable
 	EditProjectBtn   widget.Clickable
@@ -127,51 +128,39 @@ func (ui *UI) Loop() error {
 			event.Frame(gtx.Ops)
 		}
 	}
-	return ui.Shutdown()
-}
-
-// Shutdown does cleanup.
-func (ui *UI) Shutdown() error {
-	// if err := ui.Storage.Save(*ui.Project); err != nil {
-	// 	return fmt.Errorf("saving project: %v", err)
-	// }
 	return nil
 }
 
 // Update state based on events.
 //
-// TODO(jfm): investigate best way to handle errors. Some errors are for the user
+// @TODO(jfm): investigate best way to handle errors. Some errors are for the user
 // and others are for the devs.
 // Currently errors are just printed; not great for windowed applications.
+//
+// @BUG(jfm): ui not recieving keyboard events.
 func (ui *UI) Update(gtx C) {
 	if ui.Project != ui.previous {
 		ui.sync()
 	}
 	for _, event := range gtx.Events(ui) {
 		if k, ok := event.(key.Event); ok {
-			switch k.Name {
-			case key.NameEscape:
-				ui.Clear()
-			case key.NameEnter, key.NameReturn:
-				// @Cleanup
-				// on "enter" we want to launch edit form for the focused ticket.
-				//
-				// var (
-				// 	t kanban.Ticket
-				// )
-				// if err := ui.Project.Find("ID", ui.FocusedTicket, &t); err != nil {
-				// 	fmt.Printf("error: %v\n", err)
-				// } else {
-				// 	ui.InspectTicket(t)
-				// }
-			case key.NameDownArrow:
-				ui.Refocus(NextTicket)
-			case key.NameUpArrow:
-				ui.Refocus(PreviousTicket)
-			case key.NameRightArrow:
-				ui.Refocus(NextStage)
-			case key.NameLeftArrow:
-				ui.Refocus(PreviousStage)
+			if k.State == key.Press {
+				switch k.Name {
+				case key.NameEscape:
+					ui.Clear()
+				case key.NameEnter, key.NameReturn:
+					if t := ui.Focus.T; t != nil {
+						ui.EditTicket(*t)
+					}
+				case key.NameDownArrow:
+					ui.Refocus(NextTicket)
+				case key.NameUpArrow:
+					ui.Refocus(PreviousTicket)
+				case key.NameRightArrow:
+					ui.Refocus(NextStage)
+				case key.NameLeftArrow:
+					ui.Refocus(PreviousStage)
+				}
 			}
 		}
 	}
@@ -201,11 +190,18 @@ func (ui *UI) Update(gtx C) {
 		}
 		ui.Clear()
 	}
-	if p, ok := ui.Rail.Selected(); ok {
-		if ui.Project == nil || ui.Project.Name != p {
-			project, ok := ui.Projects.Find(p)
-			if ok {
-				ui.Project = project
+	// @CLEANUP(jfm): Unclear code. If no active project or the selected
+	// project does not match active project, make the selected project the
+	// active project.
+	// ID goes through a string representation bc no generics, probably a better
+	// way to structure that.
+	if id, ok := ui.Rail.Selected(); ok {
+		if ui.Project == nil || ui.Project.ID.String() != id {
+			if id, err := uuid.Parse(id); err == nil {
+				project, ok := ui.Projects.Find(id)
+				if ok {
+					ui.Project = project
+				}
 			}
 		}
 	}
@@ -297,7 +293,15 @@ func (ui *UI) Update(gtx C) {
 
 // Layout UI.
 func (ui *UI) Layout(gtx C) D {
+	// NOTE(jfm): modal implies a more specific key focus.
+	//
+	// @BUG(jfm): ESC cannot clear when inputs steal key focus.
+	// SOLUTION: make the inputs repsond to esc by cancelling focus of the input.
+	// Then somehow give focus back to ui.
 	key.InputOp{Tag: ui}.Add(gtx.Ops)
+	if ui.Modal == nil {
+		key.FocusOp{Tag: ui}.Add(gtx.Ops)
+	}
 	return layout.Flex{
 		Axis: layout.Horizontal,
 	}.Layout(
@@ -305,7 +309,6 @@ func (ui *UI) Layout(gtx C) D {
 		layout.Rigid(func(gtx C) D {
 			gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
 			gtx.Constraints.Max.X = gtx.Px(unit.Dp(80))
-			gtx.Constraints.Min.X = 0
 			return ui.layoutRail(gtx)
 		}),
 		layout.Flexed(1, func(gtx C) D {
@@ -320,7 +323,7 @@ func (ui *UI) layoutRail(gtx C) D {
 	)
 	for _, p := range ui.Projects {
 		p := p
-		rc = append(rc, control.Destination(p.Name, func(gtx C) D {
+		rc = append(rc, control.Destination(p.ID.String(), func(gtx C) D {
 			return layout.Stack{
 				Alignment: layout.Center,
 			}.Layout(
@@ -332,7 +335,7 @@ func (ui *UI) layoutRail(gtx C) D {
 				}),
 				layout.Expanded(func(gtx C) D {
 					cs := gtx.Constraints
-					if ui.Project != nil && ui.Project.Name == p.Name {
+					if isActive := ui.Project != nil && ui.Project.ID == p.ID; isActive {
 						return util.Rect{
 							Color: color.NRGBA{A: 100},
 							Size:  f32.Pt(float32(cs.Max.X), float32(cs.Min.Y)),
@@ -430,13 +433,17 @@ func (ui *UI) layoutContent(gtx C) D {
 								panel := ui.Panels[ii]
 								panels = append(panels, layout.Flexed(1, func(gtx C) D {
 									return panel.Layout(gtx, ui.Th, func() (tickets []layout.ListElement) {
-										for _, ticket := range stage.Tickets {
-											ticket := ticket
-											t := (*Ticket)(ui.TicketStates.New(ticket.Title, unsafe.Pointer(&Ticket{})))
+										for ii := range stage.Tickets {
+											ticket := stage.Tickets[ii]
+											t := (*Ticket)(ui.TicketStates.New(ticket.ID.String(), unsafe.Pointer(&Ticket{})))
 											t.Ticket = ticket
 											t.Stage = stage.Name
 											tickets = append(tickets, func(gtx C, index int) D {
-												return t.Layout(gtx, ui.Th, false)
+												var focused bool
+												if ui.Focus.T != nil && ui.Focus.T.ID == t.ID {
+													focused = true
+												}
+												return t.Layout(gtx, ui.Th, focused)
 											})
 										}
 										return tickets
@@ -471,7 +478,53 @@ const (
 
 // Refocus to the ticket in the given direction.
 // Allows movement between tickets and stages in sequential order.
-func (ui *UI) Refocus(d Direction) {}
+//
+// Stages and Tickets form a 2D array, so we can simply iterate over that with
+// an index for each dimension.
+func (ui *UI) Refocus(d Direction) {
+	if len(ui.Project.Stages) == 0 {
+		return
+	}
+	if ui.Focus.T == nil {
+		if stage := &ui.Project.Stages[ui.Focus.Stage]; len(stage.Tickets) > 0 {
+			ui.Focus.T = &stage.Tickets[ui.Focus.Ticket]
+		}
+		return
+	}
+	switch d {
+	case NextTicket:
+		ui.Focus.Ticket++
+		if ui.Focus.Ticket > len(ui.Project.Stages[ui.Focus.Stage].Tickets)-1 {
+			ui.Focus.Ticket = 0
+		}
+	case PreviousTicket:
+		ui.Focus.Ticket--
+		if ui.Focus.Ticket < 0 {
+			ui.Focus.Ticket = len(ui.Project.Stages[ui.Focus.Stage].Tickets) - 1
+		}
+	}
+	if len(ui.Project.Stages) > 1 {
+		switch d {
+		case NextStage:
+			ui.Focus.Stage++
+			ui.Focus.Ticket = 0
+			if ui.Focus.Stage > len(ui.Project.Stages)-1 {
+				ui.Focus.Stage = 0
+			}
+		case PreviousStage:
+			ui.Focus.Stage--
+			ui.Focus.Ticket = 0
+			if ui.Focus.Stage < 0 {
+				ui.Focus.Stage = len(ui.Project.Stages) - 1
+			}
+		}
+	}
+	if stage := &ui.Project.Stages[ui.Focus.Stage]; len(stage.Tickets) == 0 {
+		ui.Refocus(d)
+	} else {
+		ui.Focus.T = &stage.Tickets[ui.Focus.Ticket]
+	}
+}
 
 // Clear resets navigational state.
 func (ui *UI) Clear() {
@@ -549,9 +602,9 @@ type Projects []kanban.Project
 
 // Find and return project by name.
 // Boolean indicates whether the project exists.
-func (plist Projects) Find(name string) (*kanban.Project, bool) {
+func (plist Projects) Find(id uuid.UUID) (*kanban.Project, bool) {
 	for ii := range plist {
-		if plist[ii].Name == name {
+		if plist[ii].ID == id {
 			return &plist[ii], true
 		}
 	}

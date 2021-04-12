@@ -137,9 +137,32 @@ func (f *ProjectForm) Mode() Mode {
 }
 
 func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
-	var title = "Create a new Project"
-	if f.Project != nil {
+	var (
+		title   = "Create a new Project"
+		actions = []control.Action{
+			{
+				Clickable: &f.SubmitBtn,
+				Label:     "Submit",
+				Fg:        th.ContrastFg,
+				Bg:        th.ContrastBg,
+			},
+			{
+				Clickable: &f.CancelBtn,
+				Label:     "Cancel",
+				Fg:        th.Fg,
+				Bg:        th.Bg,
+			},
+		}
+	)
+	if f.Mode() == ModeEdit {
 		title = "Edit Project"
+		actions = append(actions, control.Action{
+			Clickable: &f.Delete.Button,
+			Label:     "Archive",
+			Fg:        th.ContrastFg,
+			Bg:        color.NRGBA{R: 200, A: 200},
+			Float:     control.FloatRight,
+		})
 	}
 	return control.Card{
 		Title: title,
@@ -153,27 +176,7 @@ func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
 				}),
 			)
 		},
-		Actions: []control.Action{
-			{
-				Clickable: &f.SubmitBtn,
-				Label:     "Submit",
-				Fg:        th.ContrastFg,
-				Bg:        th.ContrastBg,
-			},
-			{
-				Clickable: &f.CancelBtn,
-				Label:     "Cancel",
-				Fg:        th.Fg,
-				Bg:        th.Bg,
-			},
-			{
-				Clickable: &f.Delete.Button,
-				Label:     "Archive",
-				Fg:        th.ContrastFg,
-				Bg:        color.NRGBA{R: 200, A: 200},
-				Float:     control.FloatRight,
-			},
-		},
+		Actions: actions,
 	}.Layout(gtx, th)
 }
 

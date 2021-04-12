@@ -30,7 +30,7 @@ type RailChild struct {
 }
 
 // Destination is a rail item that represents a navigatable object.
-// Destinations are pab+dded by default.
+// Destinations are padded by default.
 func Destination(name string, w layout.Widget) RailChild {
 	return RailChild{
 		Name: name,
