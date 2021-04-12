@@ -11,6 +11,13 @@ import (
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/util"
 )
 
+type Float int
+
+const (
+	FloatLeft Float = iota
+	FloatRight
+)
+
 // Card implements "https://material.io/components/cards".
 type Card struct {
 	// Media    image.Image
@@ -25,6 +32,7 @@ type Action struct {
 	Label string
 	Fg    color.NRGBA
 	Bg    color.NRGBA
+	Float Float
 }
 
 func (c Card) Layout(gtx C, th *material.Theme) D {
@@ -92,17 +100,42 @@ func (c Card) Layout(gtx C, th *material.Theme) D {
 							Axis: layout.Horizontal,
 						}.Layout(
 							gtx,
-							func() (actions []layout.FlexChild) {
+							func() (flex []layout.FlexChild) {
+								var (
+									floatRight []Action
+									floatLeft  []Action
+								)
 								for ii := range c.Actions {
-									action := &c.Actions[ii]
-									actions = append(actions, layout.Rigid(func(gtx C) D {
+									if c.Actions[ii].Float == FloatRight {
+										floatRight = append(floatRight, c.Actions[ii])
+									} else {
+										floatLeft = append(floatLeft, c.Actions[ii])
+									}
+								}
+								for ii := range floatLeft {
+									action := &floatLeft[ii]
+									flex = append(flex, layout.Rigid(func(gtx C) D {
 										btn := material.Button(th, action.Clickable, action.Label)
 										btn.Color = action.Fg
 										btn.Background = action.Bg
 										return btn.Layout(gtx)
 									}))
 								}
-								return actions
+								if len(floatRight) > 0 {
+									flex = append(flex, layout.Flexed(1, func(gtx C) D {
+										return D{Size: image.Point{X: gtx.Constraints.Max.X, Y: gtx.Constraints.Min.Y}}
+									}))
+								}
+								for ii := range floatRight {
+									action := &floatRight[ii]
+									flex = append(flex, layout.Rigid(func(gtx C) D {
+										btn := material.Button(th, action.Clickable, action.Label)
+										btn.Color = action.Fg
+										btn.Background = action.Bg
+										return btn.Layout(gtx)
+									}))
+								}
+								return flex
 							}()...,
 						)
 					}),

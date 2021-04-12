@@ -151,14 +151,6 @@ func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
 				layout.Rigid(func(gtx C) D {
 					return f.Name.Layout(gtx, th, "Project Name")
 				}),
-				layout.Rigid(func(gtx C) D {
-					if f.Mode() != ModeEdit {
-						return D{}
-					}
-					btn := material.Button(th, &f.Delete.Button, "Archive")
-					btn.Background = color.NRGBA{R: 200, A: 200}
-					return btn.Layout(gtx)
-				}),
 			)
 		},
 		Actions: []control.Action{
@@ -173,6 +165,13 @@ func (f *ProjectForm) Layout(gtx C, th *material.Theme) D {
 				Label:     "Cancel",
 				Fg:        th.Fg,
 				Bg:        th.Bg,
+			},
+			{
+				Clickable: &f.Delete.Button,
+				Label:     "Archive",
+				Fg:        th.ContrastFg,
+				Bg:        color.NRGBA{R: 200, A: 200},
+				Float:     control.FloatRight,
 			},
 		},
 	}.Layout(gtx, th)
@@ -490,7 +489,7 @@ func (dpc *ArchiveProjectConfirmation) Layout(gtx C, th *material.Theme) D {
 			}.Layout(
 				gtx,
 				layout.Rigid(func(gtx C) D {
-					return dpc.Confirmation.Layout(gtx, th, "Project")
+					return dpc.Confirmation.Layout(gtx, th, "Confirm project name")
 				}),
 			)
 		},

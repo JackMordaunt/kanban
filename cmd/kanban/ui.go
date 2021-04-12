@@ -276,7 +276,7 @@ func (ui *UI) Update(gtx C) {
 		ui.EditProject()
 	}
 	if ui.ProjectForm.Delete.Button.Clicked() {
-		ui.ShowDeleteProjectConfirmation()
+		ui.ShowArchiveProjectConfirmation()
 	}
 	if ui.ArchiveProjectConfirmation.SubmitBtn.Clicked() {
 		if ui.ArchiveProjectConfirmation.Confirmation.Text() == ui.Project.Name {
@@ -534,13 +534,14 @@ func (ui *UI) EditProject() {
 	}
 }
 
-func (ui *UI) ShowDeleteProjectConfirmation() {
+func (ui *UI) ShowArchiveProjectConfirmation() {
 	if ui.Project == nil {
 		return
 	}
 	ui.Modal = func(gtx C) D {
 		return ui.ArchiveProjectConfirmation.Layout(gtx, ui.Th)
 	}
+	ui.ArchiveProjectConfirmation.Confirmation.Focus()
 }
 
 // Projects is a list of Project entities with added behaviours.
