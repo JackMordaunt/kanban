@@ -20,7 +20,9 @@ import (
 )
 
 var (
+	// MemStorage specifies whether to use in-memory storage rather than disk storage.
 	MemStorage bool
+	// ProfileOpt specifies what type of profiling, if any, to perform.
 	ProfileOpt string
 )
 
