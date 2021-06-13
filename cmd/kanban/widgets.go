@@ -15,9 +15,9 @@ import (
 	"gioui.org/x/component"
 	"git.sr.ht/~jackmordaunt/kanban"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/control"
+	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/theme"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/util"
 	"git.sr.ht/~jackmordaunt/kanban/icons"
-	"github.com/google/uuid"
 )
 
 // Mode signals the form mode.
@@ -64,47 +64,35 @@ func (f TicketForm) Submit() kanban.Ticket {
 	}
 }
 
-func (f *TicketForm) Layout(gtx C, th *material.Theme, stage string) D {
+func (f *TicketForm) Layout(gtx C, th *theme.Theme, stage string) D {
 	f.Stage = stage
 	f.Title.SingleLine = true
-	return control.Card{
-		Title: func() string {
-			if f.Ticket.ID == uuid.Nil {
-				return "Add Ticket"
-			}
-			return "Edit Ticket"
-		}(),
-		Body: func(gtx C) D {
-			return layout.Flex{
-				Axis: layout.Vertical,
-			}.Layout(
-				gtx,
-				layout.Rigid(func(gtx C) D {
-					return f.Title.Layout(gtx, th, "Title")
-				}),
-				layout.Rigid(func(gtx C) D {
-					return f.Summary.Layout(gtx, th, "Summary")
-				}),
-				layout.Rigid(func(gtx C) D {
-					return f.Details.Layout(gtx, th, "Details")
-				}),
-			)
-		},
-		Actions: []control.Action{
-			{
-				Clickable: &f.SubmitBtn,
-				Label:     "Submit",
-				Fg:        th.ContrastFg,
-				Bg:        th.ContrastBg,
-			},
-			{
-				Clickable: &f.CancelBtn,
-				Label:     "Cancel",
-				Fg:        th.Fg,
-				Bg:        th.Bg,
-			},
-		},
-	}.Layout(gtx, th)
+	return th.Dialog("Add Ticket", "create a new ticket", func(gtx C) D {
+		return layout.Flex{
+			Axis: layout.Vertical,
+		}.Layout(
+			gtx,
+			layout.Rigid(func(gtx C) D {
+				return f.Title.Layout(gtx, &th.Theme, "Title")
+			}),
+			layout.Rigid(func(gtx C) D {
+				return f.Summary.Layout(gtx, &th.Theme, "Summary")
+			}),
+			layout.Rigid(func(gtx C) D {
+				return f.Details.Layout(gtx, &th.Theme, "Details")
+			}),
+		)
+	}, theme.Action{
+		Text:      "Ok",
+		Clickable: &f.SubmitBtn,
+		Color:     th.Primary,
+		Bg:        th.Background,
+	}, theme.Action{
+		Text:      "Cancel",
+		Clickable: &f.CancelBtn,
+		Color:     th.Primary,
+		Bg:        th.Background,
+	}).Layout(gtx)
 }
 
 // ProjectForm renders a form for manipulating projects.

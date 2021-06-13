@@ -13,6 +13,7 @@ import (
 	"gioui.org/font/gofont"
 	"gioui.org/unit"
 	"gioui.org/widget/material"
+	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/theme"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
 	"git.sr.ht/~jackmordaunt/kanban/storage/lazy"
 
@@ -53,8 +54,9 @@ func main() {
 	}
 	go func() {
 		ui := UI{
-			Window:  app.NewWindow(app.Title("Kanban"), app.MinSize(unit.Dp(700), unit.Dp(250))),
+			Window:  app.NewWindow(app.Title("Kanban"), app.Size(unit.Dp(1024), unit.Dp(768)), app.MinSize(unit.Dp(700), unit.Dp(250))),
 			Th:      material.NewTheme(gofont.Collection()),
+			T:       theme.NewTheme(gofont.Collection(), theme.MaterialDesignBaseline),
 			Storage: storage,
 		}
 		if err := ui.Loop(); err != nil {

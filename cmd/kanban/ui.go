@@ -20,6 +20,7 @@ import (
 	"git.sr.ht/~jackmordaunt/kanban"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/control"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/state"
+	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/theme"
 	"git.sr.ht/~jackmordaunt/kanban/cmd/kanban/util"
 	"git.sr.ht/~jackmordaunt/kanban/icons"
 	"git.sr.ht/~jackmordaunt/kanban/storage"
@@ -46,6 +47,8 @@ type UI struct {
 
 	// Th contains theme data application wide.
 	Th *material.Theme
+
+	T *theme.Theme
 
 	// Storage driver responsible for allocating Project objects.
 	Storage storage.Storer
@@ -560,7 +563,7 @@ func (ui *UI) InspectTicket(t kanban.Ticket) {
 func (ui *UI) EditTicket(t kanban.Ticket) {
 	ui.TicketForm.Edit(t)
 	ui.Modal = func(gtx C) D {
-		return ui.TicketForm.Layout(gtx, ui.Th, "")
+		return ui.TicketForm.Layout(gtx, ui.T, "")
 	}
 }
 
@@ -568,7 +571,7 @@ func (ui *UI) EditTicket(t kanban.Ticket) {
 func (ui *UI) AddTicket(stage string) {
 	ui.TicketForm.Title.Focus()
 	ui.Modal = func(gtx C) D {
-		return ui.TicketForm.Layout(gtx, ui.Th, stage)
+		return ui.TicketForm.Layout(gtx, ui.T, stage)
 	}
 }
 
